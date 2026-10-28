@@ -5,8 +5,9 @@ import type { Db } from './db/index.ts';
 import type { Logger } from './log.ts';
 import { Router, sendJson } from './http/router.ts';
 import { serveStatic } from './http/static.ts';
+import { registerRoutes, type ApiDeps } from './api/routes.ts';
 
-export interface AppDeps {
+export interface AppDeps extends Omit<ApiDeps, 'db'> {
   config: Config;
   db: Db;
   logger: Logger;
@@ -30,6 +31,8 @@ const CSP = [
 export function createApp(deps: AppDeps): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const router = new Router();
   const apiPrefix = `${deps.config.basePath}/api/${API_VERSION}`;
+
+  registerRoutes(router, deps);
 
   router.get('/health', ({ res }) => {
     deps.db.prepare('SELECT 1').get();

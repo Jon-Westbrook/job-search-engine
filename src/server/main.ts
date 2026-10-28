@@ -4,6 +4,11 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { migrate, openDatabase, loadMigrations } from './db/index.ts';
 import { createLogger } from './log.ts';
+import { createGogRunner } from './gog/wrapper.ts';
+import { loadProfile, effectiveGmailAccount } from './profile.ts';
+import { loadSources } from './sources.ts';
+import { seedSources } from './ingest/store.ts';
+import { RefreshService } from './refresh.ts';
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel, { app: APP_NAME });
@@ -14,7 +19,18 @@ const migrations = loadMigrations();
 const schemaVersion = migrations.at(-1)?.version ?? 0;
 if (applied.length > 0) logger.info('migrations applied', { applied });
 
-const handler = createApp({ config, db, logger, schemaVersion });
+const profile = loadProfile(config.profilePath);
+const gmailAccount = effectiveGmailAccount(process.env, profile);
+const sources = loadSources(config.sourcesPath);
+seedSources(db, sources, new Date().toISOString());
+const runner = createGogRunner({
+  bin: config.gog.bin,
+  account: gmailAccount,
+  keyringPassword: process.env.GOG_KEYRING_PASSWORD || undefined,
+});
+const refresh = new RefreshService({ db, runner, logger }, sources);
+
+const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount });
 const server = createServer((req, res) => {
   void handler(req, res);
 });

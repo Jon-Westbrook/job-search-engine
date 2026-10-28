@@ -1,0 +1,15 @@
+{
+  "kind": "message",
+  "description": "single job posted on",
+  "message": {
+    "id": "fixture-single-job-posted-on",
+    "threadId": "fixture-single-job-posted-on-thread",
+    "internalDate": 1792876665000,
+    "headers": {
+      "From": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+      "Subject": "“\"Frontend Engineering Manager\" OR…”: Archer - Manager, Software Engineering - Sitecore Platform posted on 10/23/26",
+      "Date": "Sat, 24 Oct 2026 21:17:45 +0000 (UTC)"
+    },
+    "text": "Your job alert for \"Frontend Engineering Manager\" OR \"Front-End Engineering Manager\" OR \"Engineering Manager, Frontend\" OR \"UI Engineering Manager\" OR \"Manager, Frontend\" in New York City Metropolitan Area\n1 new job matches your preferences.\n\nManager, Software Engineering - Sitecore Platform\nArcher\nJersey City, NJ\nView job: https://www.linkedin.com/comm/jobs/view/4481677841/\n\n---------------------------------------------------------\n\nSee all jobs on LinkedIn:  https://www.linkedin.com/comm/jobs/search-results/\n\nJob search smarter with Premium\nhttps://www.linkedin.com/comm/premium/products/\n\n\n----------------------------------------\n\n\n"
+  }
+}
