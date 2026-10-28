@@ -6,6 +6,7 @@ import type { Logger } from './log.ts';
 import { Router, sendJson } from './http/router.ts';
 import { serveStatic } from './http/static.ts';
 import { registerRoutes, type ApiDeps } from './api/routes.ts';
+import { registerJobRoutes } from './api/jobs.ts';
 
 export interface AppDeps extends Omit<ApiDeps, 'db'> {
   config: Config;
@@ -33,6 +34,21 @@ export function createApp(deps: AppDeps): (req: IncomingMessage, res: ServerResp
   const apiPrefix = `${deps.config.basePath}/api/${API_VERSION}`;
 
   registerRoutes(router, deps);
+  registerJobRoutes(router, {
+    db: deps.db,
+    logger: deps.logger,
+    aliases: deps.aliases,
+    now: () => new Date(),
+    lastRefreshAt: () => {
+      const row = deps.db.prepare("SELECT value FROM app_meta WHERE key = 'refresh_baseline_at'").get() as { value: string } | undefined;
+      return row?.value ?? null;
+    },
+    readerAuthor: 'owner',
+    scoreVersionOf: (id) => {
+      const row = deps.db.prepare('SELECT weight_profile_id FROM score_runs WHERE job_id = ? ORDER BY id DESC LIMIT 1').get(id) as { weight_profile_id: number } | undefined;
+      return row?.weight_profile_id ?? null;
+    },
+  });
 
   router.get('/health', ({ res }) => {
     deps.db.prepare('SELECT 1').get();

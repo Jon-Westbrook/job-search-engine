@@ -10,6 +10,7 @@ import { migrate, openDatabase, loadMigrations } from '../src/server/db/index.ts
 import { createLogger } from '../src/server/log.ts';
 import { RefreshService } from '../src/server/refresh.ts';
 import { createGogRunner } from '../src/server/gog/wrapper.ts';
+import { createCodexRunner } from '../src/server/score/codex.ts';
 
 function startApp(basePath: string, webDist: string): Promise<{ server: Server; base: string }> {
   const config = { ...loadConfig({ BASE_PATH: basePath }, '/repo'), webDist };
@@ -26,6 +27,9 @@ function startApp(basePath: string, webDist: string): Promise<{ server: Server; 
     refresh: new RefreshService({ db, runner, logger, aliases: {} }, []),
     sources: [],
     gmailAccount: '',
+    codex: createCodexRunner({ bin: '/nonexistent/codex', model: 'm', reasoningEffort: 'low', timeoutMs: 1000 }),
+    codexBin: '/nonexistent/codex',
+    aliases: {},
   });
   const server = createServer((req, res) => void handler(req, res));
   return new Promise((resolve) => {
