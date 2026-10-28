@@ -35,6 +35,10 @@ export function registerRoutes(router: Router, deps: ApiDeps): void {
     sendJson(res, 202, { started: true });
   });
 
+  router.post('/refresh/cancel', ({ res }) => {
+    sendJson(res, 200, { cancelled: deps.refresh.cancel() });
+  });
+
   router.get('/refresh', ({ res }) => {
     sendJson(res, 200, deps.refresh.status());
   });

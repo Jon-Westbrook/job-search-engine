@@ -2,9 +2,10 @@ import type { Db } from '../db/index.ts';
 import { findApplicationMatch, type ApplicationMatch } from '../applications.ts';
 import { weakMatchesFor } from '../grouping.ts';
 import { GOOD_FIT_THRESHOLD, REVIEW_THRESHOLD } from '../../shared/app.ts';
+import type { Band, Confidence, Filter, JobListItem, Verdict } from '../../shared/types.ts';
 
-export type Band = 'good' | 'review' | 'low' | 'blocked' | 'unscored';
-export type Filter = 'all' | 'good' | 'review' | 'blocked' | 'applied';
+export type { Band, Filter, JobListItem };
+
 
 export interface JobRow {
   id: number;
@@ -40,33 +41,7 @@ export interface JobRow {
   verdict_tags: string | null;
   source_count: number;
   direct_value: string | null;
-}
-
-export interface JobListItem {
-  id: number;
-  title: string;
-  company: string | null;
-  location: string | null;
-  arrangement: string | null;
-  posted_at: string | null;
-  pay: { text: string; min: number; max: number; period: string | null; annualized: boolean } | null;
-  score: number | null;
-  confidence: string | null;
-  mode: string | null;
-  weight_version: number | null;
-  verdict: string | null;
-  direct_tier: 0 | 1 | 2 | 3;
-  direct_label: string;
-  flags: string[];
-  missing: string[];
-  blocked: { at: string; reason: string } | null;
-  rule_blocked: boolean;
-  applied: { date: string | null; reason: string; status: string } | null;
-  possible_duplicate: boolean;
-  source_count: number;
-  first_seen: string;
-  last_seen: string;
-  band: Band;
+  tn_value: string | null;
 }
 
 const LIST_SQL = `
@@ -83,7 +58,8 @@ SELECT j.id, j.title, j.company, j.location, j.arrangement, j.posted_at, j.comp_
        wp.version AS weight_version,
        lv.verdict AS verdict, lv.reason_tags AS verdict_tags,
        (SELECT COUNT(*) FROM job_sources js WHERE js.job_id = j.id AND js.split_at IS NULL) AS source_count,
-       (SELECT sf.ai_value FROM score_factors sf WHERE sf.score_run_id = lr.id AND sf.factor = 'Direct line') AS direct_value
+       (SELECT sf.ai_value FROM score_factors sf WHERE sf.score_run_id = lr.id AND sf.factor = 'Direct line') AS direct_value,
+       (SELECT sf.ai_value FROM score_factors sf WHERE sf.score_run_id = lr.id AND sf.factor = 'TN and visa fit') AS tn_value
 FROM jobs j
 LEFT JOIN latest_run lr ON lr.job_id = j.id
 LEFT JOIN weight_profiles wp ON wp.id = lr.weight_profile_id
@@ -138,10 +114,11 @@ function toItem(db: Db, row: JobRow): JobListItem {
     posted_at: row.posted_at,
     pay: payText(row),
     score: row.score,
-    confidence: row.confidence,
-    mode: row.mode,
+    confidence: row.confidence as Confidence | null,
+    mode: row.mode as JobListItem['mode'],
     weight_version: row.weight_version,
-    verdict: row.verdict,
+    verdict: row.verdict as Verdict | null,
+    tn_label: row.tn_value,
     direct_tier: tier,
     direct_label: tier === 0 ? 'None' : tier === 1 ? 'Direct: tier 1' : tier === 2 ? 'Direct: tier 2' : 'Direct: tier 3',
     flags,

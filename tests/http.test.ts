@@ -30,6 +30,7 @@ function startApp(basePath: string, webDist: string): Promise<{ server: Server; 
     codex: createCodexRunner({ bin: '/nonexistent/codex', model: 'm', reasoningEffort: 'low', timeoutMs: 1000 }),
     codexBin: '/nonexistent/codex',
     aliases: {},
+    rescore: async () => {},
   });
   const server = createServer((req, res) => void handler(req, res));
   return new Promise((resolve) => {

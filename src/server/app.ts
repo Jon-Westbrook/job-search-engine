@@ -13,6 +13,7 @@ export interface AppDeps extends Omit<ApiDeps, 'db'> {
   db: Db;
   logger: Logger;
   schemaVersion: number;
+  rescore: (jobId: number) => Promise<void>;
 }
 
 const CSP = [
@@ -36,6 +37,7 @@ export function createApp(deps: AppDeps): (req: IncomingMessage, res: ServerResp
   registerRoutes(router, deps);
   registerJobRoutes(router, {
     db: deps.db,
+    rescore: deps.rescore,
     logger: deps.logger,
     aliases: deps.aliases,
     now: () => new Date(),
