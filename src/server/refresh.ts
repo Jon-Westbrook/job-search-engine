@@ -14,6 +14,7 @@ export interface RefreshDeps {
   now?: () => Date;
   scoring?: ScoringDeps;
   rulesOnly?: boolean;
+  scoreLimit?: number;
 }
 
 export interface ScoringSummary {
@@ -21,6 +22,7 @@ export interface ScoringSummary {
   scored: number;
   paused: boolean;
   errors: string[];
+  remaining: number;
 }
 
 // Runs one refresh at a time. A refresh starts only when the owner presses Refresh. It
@@ -79,8 +81,8 @@ export class RefreshService {
     const scoring = this.deps.scoring;
     if (!scoring) return;
     const aiAvailable = this.deps.rulesOnly ? false : (await scoring.codex.status()).available;
-    const res = await scoreNeeded(scoring, aiAvailable);
-    this.lastScoring = { ai_available: aiAvailable, scored: res.scored, paused: res.paused, errors: res.errors };
+    const res = await scoreNeeded(scoring, aiAvailable, this.deps.scoreLimit);
+    this.lastScoring = { ai_available: aiAvailable, scored: res.scored, paused: res.paused, errors: res.errors, remaining: res.remaining };
   }
 
   private async execute(): Promise<SyncResult[]> {

@@ -15,6 +15,7 @@ export interface Config {
   sourcesPath: string;
   aliasesPath: string;
   snapshotPath: string;
+  scoreMaxPerRefresh: number;
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
@@ -58,6 +59,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     sourcesPath: resolve(cwd, 'config/sources.json'),
     aliasesPath: resolve(cwd, 'config/company_aliases.json'),
     snapshotPath: resolve(cwd, env.LOG_SNAPSHOT_PATH || 'data/job-log-snapshot.json'),
+    scoreMaxPerRefresh: parseLimit(env.SCORE_MAX_PER_REFRESH),
   };
 }
 
@@ -65,6 +67,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
 export function normalizeBasePath(raw: string): string {
   const trimmed = raw.trim().replace(/^\/+|\/+$/g, '');
   return trimmed ? `/${trimmed}` : '';
+}
+
+// AI scoring is capped per refresh so a daily refresh cannot make hundreds of calls.
+// Newest jobs are scored first. The rest wait for later refreshes.
+function parseLimit(raw: string | undefined): number {
+  const n = Number(raw ?? 100);
+  return Number.isInteger(n) && n >= 1 ? n : 100;
 }
 
 function parseLogLevel(raw: string | undefined): Config['logLevel'] {

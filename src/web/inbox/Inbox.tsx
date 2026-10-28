@@ -268,6 +268,11 @@ export function Inbox(props: {
             </button>
           </p>
         )}
+        {(status?.scoring?.remaining ?? 0) > 0 && (
+          <p className="note" role="status">
+            {status?.scoring?.remaining} jobs are waiting to be scored. They are scored on later refreshes, newest first.
+          </p>
+        )}
         {status?.last?.status === 'partial' && (
           <p className="notice notice-clay" role="status">
             Refresh finished with problems. {status.last.counts.fetchErrors ?? 0} fetch errors, {status.last.counts.parseErrors ?? 0} alerts not read. Other results are kept.

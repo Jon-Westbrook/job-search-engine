@@ -187,7 +187,7 @@ function applyRuleBlock(db: Db, job: JobRow, output: ScoreOutput, nowIso: string
 
 // Jobs that need a score: never scored, or changed since the last run (a pasted description
 // or a merge). Verdicts and blocks do not count as changes.
-export function jobsNeedingScore(db: Db): number[] {
+export function jobsNeedingScore(db: Db, limit = Number.MAX_SAFE_INTEGER): number[] {
   const rows = db
     .prepare(
       `SELECT j.id FROM jobs j
@@ -200,22 +200,27 @@ export function jobsNeedingScore(db: Db): number[] {
                AND e.created_at > (SELECT MAX(r.created_at) FROM score_runs r WHERE r.job_id = j.id)
            )
          )
-       ORDER BY j.id`,
+       ORDER BY j.last_seen DESC, j.id DESC
+       LIMIT ?`,
     )
-    .all() as Array<{ id: number }>;
+    .all(limit) as Array<{ id: number }>;
   return rows.map((r) => r.id);
 }
 
-export async function scoreNeeded(deps: ScoringDeps, aiAvailable: boolean): Promise<{ scored: number; paused: boolean; errors: string[] }> {
+export async function scoreNeeded(
+  deps: ScoringDeps,
+  aiAvailable: boolean,
+  limit = Number.MAX_SAFE_INTEGER,
+): Promise<{ scored: number; paused: boolean; errors: string[]; remaining: number }> {
   let scored = 0;
   const errors: string[] = [];
-  for (const jobId of jobsNeedingScore(deps.db)) {
+  for (const jobId of jobsNeedingScore(deps.db, limit)) {
     const outcome = await scoreJob(deps, jobId, aiAvailable);
     if (outcome.status === 'paused') {
       errors.push(outcome.error);
-      return { scored, paused: true, errors };
+      return { scored, paused: true, errors, remaining: jobsNeedingScore(deps.db).length };
     }
     scored++;
   }
-  return { scored, paused: false, errors };
+  return { scored, paused: false, errors, remaining: jobsNeedingScore(deps.db).length };
 }
