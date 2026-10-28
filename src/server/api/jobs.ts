@@ -8,9 +8,13 @@ import { ProgressBlocked, progressJob, createApplication, updateApplicationStatu
 import { ContactError, createContact } from '../contacts.ts';
 import { activeWeightProfile, saveWeightVersion, validateWeights, WeightError } from '../score/profile.ts';
 import { normalizeCompany } from '../normalize/keys.ts';
+import { loadSnapshot } from '../tracker/import-plan.ts';
+import { planFromSnapshot } from '../tracker/import-plan.ts';
+import { applyImport } from '../tracker/import-apply.ts';
 
 export interface JobsApiDeps {
   db: Db;
+  snapshotPath: string;
   rescore: (jobId: number) => Promise<void>;
   logger: Logger;
   aliases: Record<string, string>;
@@ -154,8 +158,10 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     const status = url.searchParams.get('status');
     const rows = db
       .prepare(
-        `SELECT id, company, title, source_url, status, stage, applied_at, source_channel, notes, origin, created_at, updated_at
-         FROM applications ORDER BY id DESC`,
+        `SELECT a.id, a.company, a.title, a.source_url, a.status, a.stage, a.applied_at, a.source_channel, a.notes, a.origin,
+                a.created_at, a.updated_at, i.status AS import_status
+         FROM applications a LEFT JOIN imports i ON i.application_id = a.id
+         ORDER BY a.id DESC`,
       )
       .all() as Array<Record<string, unknown>>;
     const filtered = rows.filter((r) => {
@@ -185,6 +191,43 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     if (!(APPLICATION_STATUSES as readonly string[]).includes(status)) throw new HttpError(400, 'Unknown status', 'bad_request');
     updateApplicationStatus(db, Number(params.id), status, body.note ?? null, nowIso());
     sendJson(res, 200, { ok: true });
+  }));
+
+  // Tracker import. The server reads a snapshot made from the log on the owner's machine.
+  // The plan is a dry run. Nothing is written until confirm is true.
+  router.get('/tracker/import/plan', ({ res }) => {
+    const snapshot = loadSnapshot(deps.snapshotPath);
+    if (!snapshot) {
+      sendJson(res, 200, { available: false, message: 'No log snapshot is loaded yet.' });
+      return;
+    }
+    const plan = planFromSnapshot(snapshot);
+    sendJson(res, 200, {
+      available: true,
+      generated_at: snapshot.generated_at,
+      applications_in_log: plan.applications_in_log,
+      counts: plan.counts,
+      rows: plan.rows.map((r) => ({
+        source: `${r.source_path}:${r.source_line}`,
+        company: r.company,
+        title: r.title,
+        applied_at: r.applied_at,
+        status: r.status,
+        raw_status: r.raw_status,
+        uncertain: r.uncertain,
+        reasons: r.reasons,
+      })),
+    });
+  });
+
+  router.post('/tracker/import', guard(async ({ res, json }) => {
+    const body = await json<{ confirm?: boolean }>();
+    if (body.confirm !== true) throw new HttpError(400, 'Import needs confirm: true after the plan is reviewed', 'bad_request');
+    const snapshot = loadSnapshot(deps.snapshotPath);
+    if (!snapshot) throw new HttpError(409, 'No log snapshot is loaded yet', 'conflict');
+    const result = applyImport(db, planFromSnapshot(snapshot), nowIso(), deps.aliases);
+    deps.logger.info('tracker import applied', { inserted: result.inserted, skipped: result.skipped_already_imported, uncertain: result.uncertain });
+    sendJson(res, 200, result);
   }));
 
   router.post('/contacts', guard(async ({ res, json }) => {

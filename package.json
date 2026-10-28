@@ -16,7 +16,8 @@
     "test": "node --test --test-reporter=spec \"tests/**/*.test.ts\"",
     "start": "node --disable-warning=ExperimentalWarning dist/server/main.js",
     "dev": "node --disable-warning=ExperimentalWarning src/server/main.ts",
-    "scan:secrets": "bash scripts/secret-scan.sh"
+    "scan:secrets": "bash scripts/secret-scan.sh",
+    "snapshot:log": "node --disable-warning=ExperimentalWarning src/server/tracker/snapshot-cli.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

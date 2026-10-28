@@ -14,6 +14,7 @@ export interface Config {
   codex: { bin: string; model: string; reasoningEffort: string; timeoutMs: number; rulesOnly: boolean };
   sourcesPath: string;
   aliasesPath: string;
+  snapshotPath: string;
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
@@ -56,6 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     },
     sourcesPath: resolve(cwd, 'config/sources.json'),
     aliasesPath: resolve(cwd, 'config/company_aliases.json'),
+    snapshotPath: resolve(cwd, env.LOG_SNAPSHOT_PATH || 'data/job-log-snapshot.json'),
   };
 }
 

@@ -37,6 +37,7 @@ export function createApp(deps: AppDeps): (req: IncomingMessage, res: ServerResp
   registerRoutes(router, deps);
   registerJobRoutes(router, {
     db: deps.db,
+    snapshotPath: deps.config.snapshotPath,
     rescore: deps.rescore,
     logger: deps.logger,
     aliases: deps.aliases,
