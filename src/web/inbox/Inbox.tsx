@@ -51,6 +51,7 @@ export function Inbox(props: {
   const [status, setStatus] = useState<RefreshStatus | null>(null);
   const [toast, setToast] = useState<{ jobId: number; message: string } | null>(null);
   const [collapsing, setCollapsing] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   // Keep the filters in the URL so they survive a reload.
@@ -104,6 +105,19 @@ export function Inbox(props: {
     }, 1000);
     return () => window.clearInterval(t);
   }, [running, pollRefresh, load]);
+
+  // Writes the ranked export file. The button shows the checksum and time in the notice.
+  const exportFile = async () => {
+    setBusy(true);
+    try {
+      const out = await api.post<{ file: string; checksum: string; jobs: number; generated_at: string }>('export/file', {});
+      props.onNotice(`Exported ${out.jobs} jobs to ${out.file}. Checksum ${out.checksum.slice(0, 16)}. ${clock(out.generated_at)}.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'The export did not run.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const startRefresh = async () => {
     try {
@@ -214,9 +228,14 @@ export function Inbox(props: {
       <div className="refresh-line">
         <div className="refresh-meta">
           <span className="mono">Last refresh {lastRefreshText ?? 'not yet'}</span>
-          <button type="button" className="btn" onClick={startRefresh} disabled={running}>
-            {running ? 'Refreshing' : 'Refresh now'}
-          </button>
+          <div className="row-actions">
+            <button type="button" className="btn btn-dark" onClick={exportFile} disabled={busy}>
+              Export JSON
+            </button>
+            <button type="button" className="btn" onClick={startRefresh} disabled={running}>
+              {running ? 'Refreshing' : 'Refresh now'}
+            </button>
+          </div>
         </div>
         {running && (
           <div className="progress" role="status" aria-live="polite">
