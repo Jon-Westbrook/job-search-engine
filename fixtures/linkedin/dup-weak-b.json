@@ -1,0 +1,15 @@
+{
+  "kind": "message",
+  "description": "dup weak b",
+  "message": {
+    "id": "fixture-dup-weak-b",
+    "threadId": "fixture-dup-weak-b-thread",
+    "internalDate": 1789305465000,
+    "headers": {
+      "From": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+      "Subject": "“Head of Engineering”: Posh - VP of Engineering posted on 9/11/26",
+      "Date": ""
+    },
+    "text": "Your job alert for Head of Engineering in New York          \n30+ new jobs match your preferences.\n            \nVP of Engineering\nPosh\nNew York City Metropolitan Area\nView job: https://www.linkedin.com/comm/jobs/view/4434006155/\n\n---------------------------------------------------------\n  \n            \nDirector, AI Engineering (Remote - eligible)\nCapital One\nNew York, NY\n\n1 connection\nView job: https://www.linkedin.com/comm/jobs/view/4466474520/\n\n---------------------------------------------------------\n  \n            \nDirector, AI Engineering\nHumana\nNew York, NY\n\n1 company alum\nView job: https://www.linkedin.com/comm/jobs/view/4464271405/\n\n---------------------------------------------------------\n  \n            \nSenior Vice President, AI Engineering\nPublicis Groupe\nNew York, NY\n\n363 company alumni\nView job: https://www.linkedin.com/comm/jobs/view/4427228417/\n\n---------------------------------------------------------\n  \n            \nAssociate Director, Applied AI Engineering\nDeloitte\nJersey City, NJ\n\n68 company alumni\nView job: https://www.linkedin.com/comm/jobs/view/4466461498/\n\n---------------------------------------------------------\n  \n            \nDirector, Engineering\nGarner Health\nNew York, NY\nView job: https://www.linkedin.com/comm/jobs/view/4437914660/\n\n---------------------------------------------------------\n  \nSee all jobs on LinkedIn:  https://www.linkedin.com/comm/jobs/search-results/\n\nJob search smarter with Premium\nhttps://www.linkedin.com/comm/premium/products/\n  \n\n----------------------------------------\n\n\n"
+  }
+}

@@ -173,7 +173,7 @@ function handleMessage(
   }
   for (const posting of parsed.postings) {
     counts.postings++;
-    const outcome = upsertPosting(db, posting, nowIso, source.parser_version);
+    const { outcome } = upsertPosting(db, posting, nowIso, source.parser_version);
     if (outcome === 'inserted') counts.inserted++;
     else if (outcome === 'updated') counts.updated++;
     else counts.unchanged++;

@@ -23,7 +23,7 @@ function startApp(basePath: string, webDist: string): Promise<{ server: Server; 
     logger,
     schemaVersion: loadMigrations().length,
     runner,
-    refresh: new RefreshService({ db, runner, logger }, []),
+    refresh: new RefreshService({ db, runner, logger, aliases: {} }, []),
     sources: [],
     gmailAccount: '',
   });

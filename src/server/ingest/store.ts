@@ -4,6 +4,11 @@ import type { ParsedPosting } from './linkedin.ts';
 
 export type UpsertOutcome = 'inserted' | 'updated' | 'unchanged';
 
+export interface UpsertResult {
+  outcome: UpsertOutcome;
+  postingId: number;
+}
+
 // A stable fingerprint of the parsed listing. Timestamps of observation are excluded,
 // so re-reading the same alert produces the same hash.
 export function postingHash(p: ParsedPosting, parserVersion: string): string {
@@ -26,26 +31,29 @@ export function postingHash(p: ParsedPosting, parserVersion: string): string {
 
 // Inserts a source posting, or refreshes it when it was seen before. Rows are never
 // deleted. Reprocessing the same message changes nothing except last_seen.
-export function upsertPosting(db: Db, p: ParsedPosting, nowIso: string, parserVersion: string): UpsertOutcome {
+export function upsertPosting(db: Db, p: ParsedPosting, nowIso: string, parserVersion: string): UpsertResult {
   const hash = postingHash(p, parserVersion);
   const existing = db
     .prepare('SELECT id, raw_hash FROM source_postings WHERE provider = ? AND source_id = ?')
     .get(p.provider, p.sourceId) as { id: number; raw_hash: string } | undefined;
 
   if (!existing) {
-    db.prepare(
+    const inserted = db.prepare(
       `INSERT INTO source_postings (
         provider, source_id, message_id, thread_id, url, title, company, location, arrangement,
         posted_at, alert_received_at, pay_min, pay_max, pay_currency, pay_period, pay_annualized,
         applicant_count, easy_apply, connection_hint, raw_fields, raw_hash, parser_version, first_seen, last_seen
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(...postingValues(p, hash, parserVersion, nowIso, nowIso));
-    return 'inserted';
+    const postingId = Number(inserted.lastInsertRowid);
+    recordObservation(db, postingId, p, parserVersion, nowIso);
+    return { outcome: 'inserted', postingId };
   }
 
+  recordObservation(db, existing.id, p, parserVersion, nowIso);
   if (existing.raw_hash === hash) {
     db.prepare('UPDATE source_postings SET last_seen = ? WHERE id = ?').run(nowIso, existing.id);
-    return 'unchanged';
+    return { outcome: 'unchanged', postingId: existing.id };
   }
 
   db.prepare(
@@ -79,7 +87,15 @@ export function upsertPosting(db: Db, p: ParsedPosting, nowIso: string, parserVe
     nowIso,
     existing.id,
   );
-  return 'updated';
+  return { outcome: 'updated', postingId: existing.id };
+}
+
+// One row per (posting, message). Repeats of the same message are ignored.
+export function recordObservation(db: Db, postingId: number, p: ParsedPosting, parserVersion: string, nowIso: string): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO posting_observations (posting_id, message_id, thread_id, alert_received_at, parser_version, observed_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(postingId, p.messageId, p.threadId, p.alertReceivedAt, parserVersion, nowIso);
 }
 
 function postingValues(p: ParsedPosting, hash: string, parserVersion: string, first: string, last: string): Array<string | number | null> {
