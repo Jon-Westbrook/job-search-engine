@@ -7,6 +7,7 @@ import { Router, sendJson } from './http/router.ts';
 import { serveStatic } from './http/static.ts';
 import { registerRoutes, type ApiDeps } from './api/routes.ts';
 import { registerJobRoutes } from './api/jobs.ts';
+import { registerExportRoutes } from './api/export.ts';
 
 export interface AppDeps extends Omit<ApiDeps, 'db'> {
   config: Config;
@@ -35,6 +36,7 @@ export function createApp(deps: AppDeps): (req: IncomingMessage, res: ServerResp
   const apiPrefix = `${deps.config.basePath}/api/${API_VERSION}`;
 
   registerRoutes(router, deps);
+  registerExportRoutes(router, { db: deps.db, exportDir: deps.config.exportDir, logger: deps.logger, now: () => new Date() });
   registerJobRoutes(router, {
     db: deps.db,
     snapshotPath: deps.config.snapshotPath,

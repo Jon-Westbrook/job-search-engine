@@ -1,0 +1,296 @@
+{
+  "$id": "autojob-export-v1",
+  "title": "AUTOJOB ranked job export, schema version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "weights_version",
+    "jobs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "weights_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$"
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "company",
+          "location",
+          "arrangement",
+          "compensation",
+          "posted_at",
+          "first_seen",
+          "canonical_url",
+          "sources",
+          "score",
+          "confidence",
+          "flags",
+          "factors",
+          "stage",
+          "status",
+          "verdict",
+          "reason_tags",
+          "blocked"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "arrangement": {
+            "enum": [
+              "onsite",
+              "hybrid",
+              "remote",
+              null
+            ]
+          },
+          "compensation": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "min",
+                  "max",
+                  "currency",
+                  "period",
+                  "annualized"
+                ],
+                "properties": {
+                  "min": {
+                    "type": "number"
+                  },
+                  "max": {
+                    "type": "number"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 3
+                  },
+                  "period": {
+                    "enum": [
+                      "year",
+                      "hour",
+                      null
+                    ]
+                  },
+                  "annualized": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            ]
+          },
+          "posted_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_seen": {
+            "type": "string"
+          },
+          "canonical_url": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "provider",
+                "source_id",
+                "url",
+                "message_id"
+              ],
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "source_id": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "url": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "message_id": {
+                  "type": "string",
+                  "maxLength": 80
+                }
+              }
+            }
+          },
+          "score": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              null
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "points",
+                "max",
+                "evidence",
+                "confidence"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "points": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "evidence": {
+                  "type": "array",
+                  "maxItems": 3,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "confidence": {
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low",
+                    null
+                  ]
+                }
+              }
+            }
+          },
+          "stage": {
+            "enum": [
+              "inbox",
+              "analysis"
+            ]
+          },
+          "status": {
+            "enum": [
+              "saved",
+              "applied",
+              "interviewing",
+              "rejected",
+              "offer",
+              null
+            ]
+          },
+          "verdict": {
+            "enum": [
+              "good",
+              "maybe",
+              "bad",
+              null
+            ]
+          },
+          "reason_tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "at",
+                  "reason",
+                  "scope"
+                ],
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "scope": {
+                    "enum": [
+                      "job",
+                      "rule"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
