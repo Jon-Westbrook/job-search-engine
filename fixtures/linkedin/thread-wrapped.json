@@ -1,0 +1,20 @@
+{
+  "kind": "thread",
+  "thread": {
+    "id": "fixture-thread-wrapped",
+    "messages": [
+      {
+        "id": "fixture-thread-wrapped",
+        "threadId": "fixture-thread-wrapped-thread",
+        "internalDate": 1789737465000,
+        "headers": {
+          "From": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+          "Subject": "Director, Engineering at Articore Group",
+          "Date": "Fri, 18 Sep 2026 13:17:45 +0000 (UTC)"
+        },
+        "text": "Your job alert for Director of AI Product Design, Director of Design Engineering, Director of Engineering, Technical Lead, Full Stack Enginner in New York\nNew jobs match your preferences.\n\nDirector, Engineering\nArticore Group\nNew York, NY\nView job: https://www.linkedin.com/comm/jobs/view/4467166189/\n\n---------------------------------------------------------\n\n\nSenior Director, Full-Stack Engineer\nBNY\nNew York, NY\n\nThis company is actively hiring\nView job: https://www.linkedin.com/comm/jobs/view/4468348018/\n\n---------------------------------------------------------\n\n\nDirector - AI Engineering\nNew York Life\nNew York, NY\n\nThis company is actively hiring\nView job: https://www.linkedin.com/comm/jobs/view/4459616107/\n\n---------------------------------------------------------\n\n\nSenior Vice President, Full-Stack Engineer\nBNY\nNew York, NY\n\n1 connection\nView job: https://www.linkedin.com/comm/jobs/view/4448678216/\n\n---------------------------------------------------------\n\n\nHead of Engineering (Founding Team) Equity Only — Fully Remote\nZOVU\nNew York, NY\nView job: https://www.linkedin.com/comm/jobs/view/4467141352/\n\n---------------------------------------------------------\n\n\nDirector, Product Design\nSiro\nNew York City Metropolitan Area\nView job: https://www.linkedin.com/comm/jobs/view/4468291547/\n\n---------------------------------------------------------\n\nSee all jobs on LinkedIn:  https://www.linkedin.com/comm/jobs/search-results/\n\nJob search smarter with Premium\nhttps://www.linkedin.com/comm/premium/products/\n\n\n----------------------------------------\n\n\n"
+      }
+    ]
+  },
+  "description": "thread wrapped"
+}

@@ -1,0 +1,15 @@
+{
+  "kind": "message",
+  "description": "single job no date",
+  "message": {
+    "id": "fixture-single-job-no-date",
+    "threadId": "fixture-single-job-no-date-thread",
+    "internalDate": 1790090264000,
+    "headers": {
+      "From": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+      "Subject": "Sesame - Creative Director",
+      "Date": "Tue, 22 Sep 2026 15:17:44 +0000 (UTC)"
+    },
+    "text": "Your job alert for Director in New York City Metropolitan Area\nA new job matches your preferences.\n\nCreative Director\nSesame\nNew York, NY\n\n1 connection\nView job: https://www.linkedin.com/comm/jobs/view/4440412620/\n\n---------------------------------------------------------\n\nSee all jobs on LinkedIn:  https://www.linkedin.com/comm/jobs/search-results/\n\nJob search smarter with Premium\nhttps://www.linkedin.com/comm/premium/products/\n\n\n----------------------------------------\n\n\n"
+  }
+}

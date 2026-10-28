@@ -8,16 +8,24 @@ import { createApp } from '../src/server/app.ts';
 import { loadConfig } from '../src/server/config.ts';
 import { migrate, openDatabase, loadMigrations } from '../src/server/db/index.ts';
 import { createLogger } from '../src/server/log.ts';
+import { RefreshService } from '../src/server/refresh.ts';
+import { createGogRunner } from '../src/server/gog/wrapper.ts';
 
 function startApp(basePath: string, webDist: string): Promise<{ server: Server; base: string }> {
   const config = { ...loadConfig({ BASE_PATH: basePath }, '/repo'), webDist };
   const db = openDatabase(':memory:');
   migrate(db);
+  const logger = createLogger('error', {}, () => {});
+  const runner = createGogRunner({ bin: '/nonexistent/gog', account: '' });
   const handler = createApp({
     config,
     db,
-    logger: createLogger('error', {}, () => {}),
+    logger,
     schemaVersion: loadMigrations().length,
+    runner,
+    refresh: new RefreshService({ db, runner, logger }, []),
+    sources: [],
+    gmailAccount: '',
   });
   const server = createServer((req, res) => void handler(req, res));
   return new Promise((resolve) => {
