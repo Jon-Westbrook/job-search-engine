@@ -32,7 +32,8 @@ export function App() {
     window.setTimeout(() => setNotice(null), 4000);
   }, []);
 
-  const gmailNeedsAttention = Boolean(status?.last_error && /gog|gmail|token|auth/i.test(status.last_error));
+  const gmailErrors = [status?.last_error ?? '', ...(status?.last?.errors ?? []).map((e) => e.error)].join(' ');
+  const gmailNeedsAttention = /gog|gmail|token|keyring/i.test(gmailErrors) && /(failed|token|keyring|auth)/i.test(gmailErrors);
   const aiNeedsAttention = status?.scoring?.ai_available === false;
 
   return (

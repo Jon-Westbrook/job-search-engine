@@ -100,7 +100,7 @@ export interface RefreshStatus {
   started_at: string | null;
   completed_at: string | null;
   progress: { done: number; total: number; messages: number } | null;
-  last: { status: string; counts: Record<string, number>; finished_at?: string } | null;
+  last: { status: string; counts: Record<string, number>; errors?: Array<{ error: string; message_id?: string; thread_id?: string }> } | null;
   last_error: string | null;
   scoring: { ai_available: boolean; scored: number; paused: boolean; errors: string[] } | null;
 }
