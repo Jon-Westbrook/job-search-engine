@@ -1,0 +1,12 @@
+title = "job-search-engine gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that are never committed or are generated"
+paths = [
+  '''node_modules/''',
+  '''dist/''',
+  '''^docs/''',
+]

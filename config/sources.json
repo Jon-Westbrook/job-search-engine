@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "linkedin-job-alerts",
+      "type": "gmail",
+      "enabled": true,
+      "query": "from:(jobalerts-noreply@linkedin.com OR jobs-noreply@linkedin.com)",
+      "overlap_days": 3,
+      "initial_lookback_days": 60,
+      "parser_version": "linkedin-alert-v1"
+    }
+  ]
+}

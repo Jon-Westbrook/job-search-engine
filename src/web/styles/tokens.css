@@ -1,0 +1,30 @@
+/* Ember Terminal design tokens (brief section 16.1). Dark only, solid ground, no decorative background. */
+:root {
+  color-scheme: dark;
+
+  --ground: #17120f;
+  --panel: #221a16;
+  --bar: #0d0a08;
+  --raise: #2d231e;
+  --cream: #efe6da;
+  --ash: #a39a90;
+  --coral: #ff7a59;
+  --clay: #e3a27c;
+  --brick: #d8705f;
+
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'Archivo Black', Impact, sans-serif;
+
+  --border: 3px solid var(--cream);
+  --shadow: 4px 4px 0 var(--cream);
+  --shadow-lg: 6px 6px 0 var(--cream);
+
+  --grid: 8px;
+  --panel-width: 480px;
+  --sheet-ms: 340ms;
+  --press-ms: 80ms;
+  --verdict-ms: 120ms;
+  --block-collapse-ms: 200ms;
+  --stat-tick-ms: 150ms;
+}

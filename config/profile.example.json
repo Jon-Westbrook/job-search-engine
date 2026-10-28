@@ -1,0 +1,16 @@
+{
+  "gmail_account": "<your-gmail-account>",
+  "display_name": "<your name>",
+  "resume_summary": "<a short plain-text summary of the master resume, used as evidence for role fit>",
+  "status": {
+    "work_authorization": "<describe your status in plain words, or leave empty>",
+    "tn_note": "<optional note on how the TN wording should read in the UI>"
+  },
+  "targets": {
+    "accepted_geography": ["<city or region>", "<state for remote-eligible roles>"],
+    "minimum_base_usd": null,
+    "target_base_usd": null
+  },
+  "tn_hostile_agencies": [],
+  "contacts_note": "Contacts are entered by hand in the app. Do not add them here."
+}

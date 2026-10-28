@@ -1,0 +1,30 @@
+# Local reference material. Never commit.
+docs/
+
+# Secrets and personal config
+.env
+.env.*
+!.env.example
+config/profile.json
+config/*.local.*
+secrets/
+*.pem
+*.key
+*gog*.json
+credentials*.json
+client_secret*.json
+*.token.json
+
+# Runtime data
+data/
+exports/
+logs/
+*.db
+*.sqlite*
+
+# Build and tooling
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
