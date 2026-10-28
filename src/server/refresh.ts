@@ -4,6 +4,7 @@ import type { GogRunner } from './gog/wrapper.ts';
 import { runIngestion, type SyncResult, type SyncSource } from './ingest/sync.ts';
 import type { SourceConfig } from './sources.ts';
 import { groupNewPostings } from './grouping.ts';
+import { scoreNeeded, type ScoringDeps } from './score/service.ts';
 
 export interface RefreshDeps {
   db: Db;
@@ -11,6 +12,15 @@ export interface RefreshDeps {
   logger: Logger;
   aliases: Record<string, string>;
   now?: () => Date;
+  scoring?: ScoringDeps;
+  rulesOnly?: boolean;
+}
+
+export interface ScoringSummary {
+  ai_available: boolean;
+  scored: number;
+  paused: boolean;
+  errors: string[];
 }
 
 // Runs one refresh at a time. A refresh starts only when the owner presses Refresh. It
@@ -20,6 +30,7 @@ export class RefreshService {
   private lastResult: SyncResult | null = null;
   private lastError: string | null = null;
   private startedAt: string | null = null;
+  private lastScoring: ScoringSummary | null = null;
 
   private readonly deps: RefreshDeps;
   private readonly sources: SourceConfig[];
@@ -29,8 +40,8 @@ export class RefreshService {
     this.sources = sources;
   }
 
-  status(): { running: boolean; started_at: string | null; last: SyncResult | null; last_error: string | null } {
-    return { running: this.running, started_at: this.startedAt, last: this.lastResult, last_error: this.lastError };
+  status(): { running: boolean; started_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null } {
+    return { running: this.running, started_at: this.startedAt, last: this.lastResult, last_error: this.lastError, scoring: this.lastScoring };
   }
 
   // Starts a refresh in the background and returns at once. Returns false if one is running.
@@ -51,6 +62,16 @@ export class RefreshService {
     return this.execute();
   }
 
+  // Scores new and changed jobs. Uses AI when the Codex sign-in works and rules-only mode
+  // is not forced. A provider failure pauses scoring and keeps the last good scores.
+  private async scoreAfterIngest(): Promise<void> {
+    const scoring = this.deps.scoring;
+    if (!scoring) return;
+    const aiAvailable = this.deps.rulesOnly ? false : (await scoring.codex.status()).available;
+    const res = await scoreNeeded(scoring, aiAvailable);
+    this.lastScoring = { ai_available: aiAvailable, scored: res.scored, paused: res.paused, errors: res.errors };
+  }
+
   private async execute(): Promise<SyncResult[]> {
     const results: SyncResult[] = [];
     try {
@@ -68,11 +89,21 @@ export class RefreshService {
         this.lastResult = result;
       }
       groupNewPostings(this.deps.db, this.deps.aliases, new Date().toISOString());
+      await this.scoreAfterIngest();
     } catch (err) {
       this.lastError = err instanceof Error ? err.message : 'refresh failed';
       this.deps.logger.error('refresh failed', { error: err });
     } finally {
       this.running = false;
+      if (!this.lastError) {
+        // Keep the previous completion as the baseline for "new since refresh".
+        const now = new Date().toISOString();
+        const previous = this.deps.db.prepare("SELECT value FROM app_meta WHERE key = 'last_refresh_completed_at'").get() as { value: string } | undefined;
+        const baseline = previous?.value ?? '1970-01-01T00:00:00.000Z';
+        const upsert = this.deps.db.prepare('INSERT INTO app_meta (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at');
+        upsert.run('refresh_baseline_at', baseline, now);
+        upsert.run('last_refresh_completed_at', now, now);
+      }
     }
     return results;
   }

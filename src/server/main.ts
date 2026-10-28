@@ -10,6 +10,8 @@ import { loadSources } from './sources.ts';
 import { seedSources } from './ingest/store.ts';
 import { RefreshService } from './refresh.ts';
 import { loadAliases } from './normalize/aliases.ts';
+import { createCodexRunner } from './score/codex.ts';
+import { seedWeightProfile } from './score/profile.ts';
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel, { app: APP_NAME });
@@ -30,9 +32,18 @@ const runner = createGogRunner({
   keyringPassword: process.env.GOG_KEYRING_PASSWORD || undefined,
 });
 const aliases = loadAliases(config.aliasesPath, config.aliasesPath.replace(/\.json$/, '.local.json'));
-const refresh = new RefreshService({ db, runner, logger, aliases }, sources);
+seedWeightProfile(db, new Date().toISOString());
+const codex = createCodexRunner({
+  bin: config.codex.bin,
+  model: config.codex.model,
+  reasoningEffort: config.codex.reasoningEffort,
+  timeoutMs: config.codex.timeoutMs,
+});
+const profileForScoring = profile;
+const scoring = { db, codex, logger, now: () => new Date(), aliases, profile: profileForScoring };
+const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly }, sources);
 
-const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount });
+const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount, codex, codexBin: config.codex.bin, aliases });
 const server = createServer((req, res) => {
   void handler(req, res);
 });

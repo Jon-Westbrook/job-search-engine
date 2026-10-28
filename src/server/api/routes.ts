@@ -4,6 +4,8 @@ import type { GogRunner } from '../gog/wrapper.ts';
 import { finishGmailAuth, gmailHealth, startGmailAuth } from '../gog/setup.ts';
 import { HttpError, type Router, sendJson } from '../http/router.ts';
 import type { RefreshService } from '../refresh.ts';
+import type { CodexRunner } from '../score/codex.ts';
+import { startDeviceLogin } from '../score/codex.ts';
 import type { SourceConfig } from '../sources.ts';
 
 export interface ApiDeps {
@@ -12,6 +14,9 @@ export interface ApiDeps {
   refresh: RefreshService;
   sources: SourceConfig[];
   gmailAccount: string;
+  codex: CodexRunner;
+  codexBin: string;
+  aliases: Record<string, string>;
 }
 
 // Registers the API routes. Paths are relative to the API prefix.
@@ -48,6 +53,15 @@ export function registerRoutes(router: Router, deps: ApiDeps): void {
       sources: rows.map((r) => ({ ...r, last_counts: r.last_counts ? JSON.parse(String(r.last_counts)) : null })),
       configured: deps.sources.length,
     });
+  });
+
+  router.get('/setup/codex', async ({ res }) => {
+    sendJson(res, 200, await deps.codex.status());
+  });
+
+  router.post('/setup/codex/start', async ({ res }) => {
+    const out = await startDeviceLogin(deps.codexBin);
+    sendJson(res, 'error' in out ? 502 : 200, out);
   });
 
   router.get('/setup/gmail', async ({ res }) => {
