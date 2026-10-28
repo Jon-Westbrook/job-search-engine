@@ -9,6 +9,7 @@ import { loadProfile, effectiveGmailAccount } from './profile.ts';
 import { loadSources } from './sources.ts';
 import { seedSources } from './ingest/store.ts';
 import { RefreshService } from './refresh.ts';
+import { loadAliases } from './normalize/aliases.ts';
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel, { app: APP_NAME });
@@ -28,7 +29,8 @@ const runner = createGogRunner({
   account: gmailAccount,
   keyringPassword: process.env.GOG_KEYRING_PASSWORD || undefined,
 });
-const refresh = new RefreshService({ db, runner, logger }, sources);
+const aliases = loadAliases(config.aliasesPath, config.aliasesPath.replace(/\.json$/, '.local.json'));
+const refresh = new RefreshService({ db, runner, logger, aliases }, sources);
 
 const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount });
 const server = createServer((req, res) => {

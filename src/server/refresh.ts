@@ -3,6 +3,15 @@ import type { Logger } from './log.ts';
 import type { GogRunner } from './gog/wrapper.ts';
 import { runIngestion, type SyncResult, type SyncSource } from './ingest/sync.ts';
 import type { SourceConfig } from './sources.ts';
+import { groupNewPostings } from './grouping.ts';
+
+export interface RefreshDeps {
+  db: Db;
+  runner: GogRunner;
+  logger: Logger;
+  aliases: Record<string, string>;
+  now?: () => Date;
+}
 
 // Runs one refresh at a time. A refresh starts only when the owner presses Refresh. It
 // never starts on launch or on a timer.
@@ -12,10 +21,10 @@ export class RefreshService {
   private lastError: string | null = null;
   private startedAt: string | null = null;
 
-  private readonly deps: { db: Db; runner: GogRunner; logger: Logger; now?: () => Date };
+  private readonly deps: RefreshDeps;
   private readonly sources: SourceConfig[];
 
-  constructor(deps: { db: Db; runner: GogRunner; logger: Logger; now?: () => Date }, sources: SourceConfig[]) {
+  constructor(deps: RefreshDeps, sources: SourceConfig[]) {
     this.deps = deps;
     this.sources = sources;
   }
@@ -58,6 +67,7 @@ export class RefreshService {
         results.push(result);
         this.lastResult = result;
       }
+      groupNewPostings(this.deps.db, this.deps.aliases, new Date().toISOString());
     } catch (err) {
       this.lastError = err instanceof Error ? err.message : 'refresh failed';
       this.deps.logger.error('refresh failed', { error: err });
