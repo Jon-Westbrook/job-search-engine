@@ -1,0 +1,34 @@
+{
+  "name": "job-search-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first triage for LinkedIn job alerts read through Gmail (AUTOJOB is a placeholder name).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev:web": "vite",
+    "build:web": "vite build",
+    "build:server": "tsc -p tsconfig.json && cp -R src/server/db/migrations dist/server/db/",
+    "build": "npm run build:server && npm run build:web",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "node --test --test-reporter=spec \"tests/**/*.test.ts\"",
+    "start": "node --disable-warning=ExperimentalWarning dist/server/main.js",
+    "dev": "node --disable-warning=ExperimentalWarning src/server/main.ts",
+    "scan:secrets": "bash scripts/secret-scan.sh"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.5"
+  }
+}
