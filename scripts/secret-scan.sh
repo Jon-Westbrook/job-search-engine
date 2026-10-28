@@ -47,6 +47,23 @@ check "Google Drive link" 'drive\.google\.com'
 check "LinkedIn profile link" 'linkedin\.com/in/'
 check "private key or token" '(BEGIN [A-Z ]*PRIVATE KEY|ya29\.[A-Za-z0-9._-]{10,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{20,})'
 
+# Commit metadata. Commits that are not on the remote yet must use a noreply author address
+# and must not carry the owner's name. Already-pushed history is reported by the audit, not blocked.
+UNPUSHED=$(git log --format='%H %an <%ae>' "@{upstream}..HEAD" 2>/dev/null || git log --format='%H %an <%ae>' HEAD)
+if [ -n "$UNPUSHED" ]; then
+  bad_author=$(echo "$UNPUSHED" | grep -v -E 'users\.noreply\.github\.com>$' || true)
+  if [ -n "$bad_author" ]; then
+    echo "BLOCKED: commit author is not a noreply address"
+    echo "$bad_author" | cut -c1-120 | sed 's/^/  /'
+    fail=1
+  fi
+  bad_name=$(echo "$UNPUSHED" | grep -i -E 'jonathon|westbrook' || true)
+  if [ -n "$bad_name" ]; then
+    echo "BLOCKED: commit author name is personal"
+    fail=1
+  fi
+fi
+
 if command -v gitleaks >/dev/null 2>&1; then
   log=$(mktemp)
   if ! gitleaks detect --no-git --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 >"$log" 2>&1; then
