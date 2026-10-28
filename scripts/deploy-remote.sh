@@ -12,6 +12,7 @@ ssh "$HOST" 'set -euo pipefail
   systemctl --user restart job-search-engine
   sleep 3
   systemctl --user is-active job-search-engine
-  curl -fsS http://127.0.0.1:3460/api/v1/health
+  set -a; . ~/data/job-search-engine/job-search-engine.env; set +a
+  curl -fsS "http://127.0.0.1:${PORT}${BASE_PATH}/api/v1/health"
   echo
 '
