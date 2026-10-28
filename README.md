@@ -57,6 +57,19 @@ Secrets such as the Gog keyring password are read from the environment only. The
 - Untrusted text (alert bodies, pasted descriptions) is treated as data. It is delimited in prompts and validated against a strict schema. It cannot change a score.
 - The export never includes tokens, cookies, raw email bodies, or the database file.
 
+## Tracker import (optional)
+
+The Tracker can import applications from a private job-search log. The app never writes to the log.
+
+1. On the machine that holds the log, make a snapshot. The snapshot keeps structured fields only and no narrative text or contact names:
+
+   ```sh
+   npm run snapshot:log -- <path-to-log> data/job-log-snapshot.json
+   ```
+
+2. Copy the snapshot to the server and set `LOG_SNAPSHOT_PATH` to its location.
+3. Open the Tracker, review the plan, then confirm the import. Uncertain records (approximate or missing dates, unclear statuses, generic titles) are flagged and never guessed. Re-running the import adds nothing new.
+
 ## Development notes
 
 - Migrations live in `src/server/db/migrations/`. Every schema change gets a new file.

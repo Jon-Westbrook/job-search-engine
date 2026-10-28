@@ -4,6 +4,7 @@ import type { RefreshStatus } from '../shared/types.ts';
 import { Inbox } from './inbox/Inbox.tsx';
 import { SetupDialog } from './setup/SetupDialog.tsx';
 import { WeightsDialog } from './settings/Weights.tsx';
+import { Tracker } from './tracker/Tracker.tsx';
 
 type Tab = 'inbox' | 'analysis' | 'submit' | 'tracker';
 const TABS: Array<{ key: Tab; label: string }> = [
@@ -13,10 +14,9 @@ const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'tracker', label: 'Tracker' },
 ];
 
-const PLACEHOLDER: Record<Exclude<Tab, 'inbox'>, string> = {
+const PLACEHOLDER: Record<'analysis' | 'submit', string> = {
   analysis: 'Analysis ships in Phase 2.',
   submit: 'Submit ships in Phase 3.',
-  tracker: 'The Tracker is the next checkpoint.',
 };
 
 export function App() {
@@ -64,10 +64,12 @@ export function App() {
             gmailNeedsAttention={gmailNeedsAttention}
             aiNeedsAttention={aiNeedsAttention}
           />
+        ) : tab === 'tracker' ? (
+          <Tracker onNotice={flash} />
         ) : (
           <section className="placeholder" aria-label={TABS.find((t) => t.key === tab)?.label}>
             <h1 className="title">{TABS.find((t) => t.key === tab)?.label}</h1>
-            <p className="empty">{PLACEHOLDER[tab as Exclude<Tab, 'inbox'>]}</p>
+            <p className="empty">{PLACEHOLDER[tab]}</p>
           </section>
         )}
       </main>
