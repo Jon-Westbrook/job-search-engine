@@ -42,7 +42,7 @@ const codex = createCodexRunner({
 });
 const profileForScoring = profile;
 const scoring = { db, codex, logger, now: () => new Date(), aliases, profile: profileForScoring };
-const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly }, sources);
+const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly, scoreLimit: config.scoreMaxPerRefresh }, sources);
 
 const rescore = async (jobId: number): Promise<void> => {
   const aiAvailable = !config.codex.rulesOnly && (await codex.status()).available;
