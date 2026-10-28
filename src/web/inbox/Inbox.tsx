@@ -260,7 +260,15 @@ export function Inbox(props: {
             </button>
           </p>
         )}
-        {status?.last && status.last.status !== 'ok' && (
+        {status?.last?.status === 'failed' && (
+          <p className="alert" role="alert">
+            The last refresh could not read Gmail. {status.last.errors?.[0]?.error ?? 'The reason is in the log.'}{' '}
+            <button type="button" className="linkish" onClick={props.onOpenSetup}>
+              View setup
+            </button>
+          </p>
+        )}
+        {status?.last?.status === 'partial' && (
           <p className="notice notice-clay" role="status">
             Refresh finished with problems. {status.last.counts.fetchErrors ?? 0} fetch errors, {status.last.counts.parseErrors ?? 0} alerts not read. Other results are kept.
           </p>
