@@ -12,6 +12,7 @@ import { RefreshService } from './refresh.ts';
 import { loadAliases } from './normalize/aliases.ts';
 import { createCodexRunner } from './score/codex.ts';
 import { seedWeightProfile } from './score/profile.ts';
+import { scoreJob } from './score/service.ts';
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel, { app: APP_NAME });
@@ -43,7 +44,11 @@ const profileForScoring = profile;
 const scoring = { db, codex, logger, now: () => new Date(), aliases, profile: profileForScoring };
 const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly }, sources);
 
-const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount, codex, codexBin: config.codex.bin, aliases });
+const rescore = async (jobId: number): Promise<void> => {
+  const aiAvailable = !config.codex.rulesOnly && (await codex.status()).available;
+  await scoreJob(scoring, jobId, aiAvailable);
+};
+const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount, codex, codexBin: config.codex.bin, aliases, rescore });
 const server = createServer((req, res) => {
   void handler(req, res);
 });

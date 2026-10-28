@@ -2,7 +2,7 @@ import { BLOCK_UNDO_WINDOW_MS } from '../../shared/app.ts';
 import type { Db } from '../db/index.ts';
 import type { Logger } from '../log.ts';
 import { HttpError, type Router, type RouteHandler, sendJson } from '../http/router.ts';
-import { ActionError, blockJob, groupPostingInto, openListing, overrideBlock, setDescription, setVerdict, splitPosting, undoBlock } from '../jobs/actions.ts';
+import { ActionError, blockJob, mergeJobs, openListing, overrideBlock, setDescription, setVerdict, splitPosting, undoBlock } from '../jobs/actions.ts';
 import { jobDetail, listJobs, stats, type Filter } from '../jobs/read.ts';
 import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
 import { ContactError, createContact } from '../contacts.ts';
@@ -11,6 +11,7 @@ import { normalizeCompany } from '../normalize/keys.ts';
 
 export interface JobsApiDeps {
   db: Db;
+  rescore: (jobId: number) => Promise<void>;
   logger: Logger;
   aliases: Record<string, string>;
   now: () => Date;
@@ -109,8 +110,11 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
 
   router.post('/jobs/:id/description', guard(async ({ res, params, json }) => {
     const body = await json<{ text?: string }>();
-    const result = setDescription(db, jobId(params), String(body.text ?? ''), nowIso());
-    sendJson(res, 200, { merged: result.merged });
+    const id = jobId(params);
+    const result = setDescription(db, id, String(body.text ?? ''), nowIso());
+    // A pasted description changes the evidence, so the job is scored again now.
+    await deps.rescore(id);
+    sendJson(res, 200, { merged: result.merged, rescored: true });
   }));
 
   router.post('/jobs/:id/split', guard(async ({ res, params, json }) => {
@@ -119,9 +123,13 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     sendJson(res, 200, { new_job_id: newJob });
   }));
 
+  // Keep grouped: another job with a similar title joins this one on purpose.
   router.post('/jobs/:id/group', guard(async ({ res, params, json }) => {
-    const body = await json<{ posting_id?: number; reason?: string }>();
-    groupPostingInto(db, jobId(params), Number(body.posting_id), String(body.reason ?? 'kept grouped by the owner'), deps.aliases, nowIso());
+    const body = await json<{ from_job_id?: number }>();
+    const target = jobId(params);
+    const from = Number(body.from_job_id);
+    if (!Number.isInteger(from) || from === target) throw new HttpError(400, 'Choose a different job to group', 'bad_request');
+    mergeJobs(db, target, from, 'manual', 'kept grouped by the owner', nowIso());
     sendJson(res, 200, { ok: true });
   }));
 

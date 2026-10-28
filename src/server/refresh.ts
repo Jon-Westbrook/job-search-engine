@@ -1,7 +1,7 @@
 import type { Db } from './db/index.ts';
 import type { Logger } from './log.ts';
 import type { GogRunner } from './gog/wrapper.ts';
-import { runIngestion, type SyncResult, type SyncSource } from './ingest/sync.ts';
+import { runIngestion, type SyncProgress, type SyncResult, type SyncSource } from './ingest/sync.ts';
 import type { SourceConfig } from './sources.ts';
 import { groupNewPostings } from './grouping.ts';
 import { scoreNeeded, type ScoringDeps } from './score/service.ts';
@@ -31,6 +31,9 @@ export class RefreshService {
   private lastError: string | null = null;
   private startedAt: string | null = null;
   private lastScoring: ScoringSummary | null = null;
+  private progress: SyncProgress | null = null;
+  private completedAt: string | null = null;
+  private cancelRequested = false;
 
   private readonly deps: RefreshDeps;
   private readonly sources: SourceConfig[];
@@ -40,14 +43,22 @@ export class RefreshService {
     this.sources = sources;
   }
 
-  status(): { running: boolean; started_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null } {
-    return { running: this.running, started_at: this.startedAt, last: this.lastResult, last_error: this.lastError, scoring: this.lastScoring };
+  status(): { running: boolean; started_at: string | null; completed_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null; progress: SyncProgress | null } {
+    return { running: this.running, started_at: this.startedAt, completed_at: this.completedAt, last: this.lastResult, last_error: this.lastError, scoring: this.lastScoring, progress: this.progress };
+  }
+
+  // Asks the running refresh to stop after the current thread. Completed work is kept.
+  cancel(): boolean {
+    if (!this.running) return false;
+    this.cancelRequested = true;
+    return true;
   }
 
   // Starts a refresh in the background and returns at once. Returns false if one is running.
   start(): boolean {
     if (this.running) return false;
     this.running = true;
+    this.cancelRequested = false;
     this.startedAt = (this.deps.now ? this.deps.now() : new Date()).toISOString();
     this.lastError = null;
     void this.execute();
@@ -84,7 +95,17 @@ export class RefreshService {
           initial_lookback_days: source.initial_lookback_days,
           parser_version: source.parser_version,
         };
-        const result = await runIngestion({ db: this.deps.db, runner: this.deps.runner, logger: this.deps.logger, now: this.deps.now }, syncSource);
+        const result = await runIngestion(
+          {
+            db: this.deps.db,
+            runner: this.deps.runner,
+            logger: this.deps.logger,
+            now: this.deps.now,
+            onProgress: (p) => (this.progress = p),
+            isCancelled: () => this.cancelRequested,
+          },
+          syncSource,
+        );
         results.push(result);
         this.lastResult = result;
       }
@@ -95,6 +116,7 @@ export class RefreshService {
       this.deps.logger.error('refresh failed', { error: err });
     } finally {
       this.running = false;
+      this.progress = null;
       if (!this.lastError) {
         // Keep the previous completion as the baseline for "new since refresh".
         const now = new Date().toISOString();
@@ -103,6 +125,7 @@ export class RefreshService {
         const upsert = this.deps.db.prepare('INSERT INTO app_meta (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at');
         upsert.run('refresh_baseline_at', baseline, now);
         upsert.run('last_refresh_completed_at', now, now);
+        this.completedAt = now;
       }
     }
     return results;

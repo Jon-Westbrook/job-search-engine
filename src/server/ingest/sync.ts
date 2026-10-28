@@ -45,11 +45,19 @@ export interface SyncResult {
   cursorAfter: string | null;
 }
 
+export interface SyncProgress {
+  done: number;
+  total: number;
+  messages: number;
+}
+
 export interface SyncDeps {
   db: Db;
   runner: GogRunner;
   logger: Logger;
   now?: () => Date;
+  onProgress?: (p: SyncProgress) => void;
+  isCancelled?: () => boolean;
 }
 
 // One incremental pass. It reads the search window from the cursor minus the overlap,
@@ -108,7 +116,13 @@ export async function runIngestion(deps: SyncDeps, source: SyncSource): Promise<
   if (fatal) addError({ error: `search failed: ${fatal}` });
 
   if (!fatal) {
-    for (const threadId of uniqueThreads) {
+    for (const [index, threadId] of uniqueThreads.entries()) {
+      if (deps.isCancelled?.()) {
+        addError({ error: 'Cancelled by the owner. Threads not yet read were skipped.' });
+        fetchFailed = true;
+        break;
+      }
+      deps.onProgress?.({ done: index, total: uniqueThreads.length, messages: counts.messages });
       const fetched = await getThreadMessages(runner, threadId);
       if (!fetched.ok) {
         fetchFailed = true;
