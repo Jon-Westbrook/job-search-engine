@@ -79,4 +79,4 @@ The Tracker can import applications from a private job-search log. The app never
 
 ## License
 
-Not yet chosen.
+MIT. See LICENSE.
