@@ -211,16 +211,20 @@ export async function scoreNeeded(
   deps: ScoringDeps,
   aiAvailable: boolean,
   limit = Number.MAX_SAFE_INTEGER,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<{ scored: number; paused: boolean; errors: string[]; remaining: number }> {
   let scored = 0;
   const errors: string[] = [];
-  for (const jobId of jobsNeedingScore(deps.db, limit)) {
+  const ids = jobsNeedingScore(deps.db, limit);
+  onProgress?.(0, ids.length);
+  for (const jobId of ids) {
     const outcome = await scoreJob(deps, jobId, aiAvailable);
     if (outcome.status === 'paused') {
       errors.push(outcome.error);
       return { scored, paused: true, errors, remaining: jobsNeedingScore(deps.db).length };
     }
     scored++;
+    onProgress?.(scored, ids.length);
   }
   return { scored, paused: false, errors, remaining: jobsNeedingScore(deps.db).length };
 }
