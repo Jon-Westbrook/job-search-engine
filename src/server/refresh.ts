@@ -1,7 +1,7 @@
 import type { Db } from './db/index.ts';
 import type { Logger } from './log.ts';
 import type { GogRunner } from './gog/wrapper.ts';
-import { runIngestion, type SyncProgress, type SyncResult, type SyncSource } from './ingest/sync.ts';
+import { runIngestion, type RefreshPhase, type SyncResult, type SyncSource } from './ingest/sync.ts';
 import type { SourceConfig } from './sources.ts';
 import { groupNewPostings } from './grouping.ts';
 import { scoreNeeded, type ScoringDeps } from './score/service.ts';
@@ -15,6 +15,13 @@ export interface RefreshDeps {
   scoring?: ScoringDeps;
   rulesOnly?: boolean;
   scoreLimit?: number;
+}
+
+export interface RefreshProgress {
+  phase: RefreshPhase;
+  done: number;
+  total: number;
+  messages: number;
 }
 
 export interface ScoringSummary {
@@ -33,7 +40,7 @@ export class RefreshService {
   private lastError: string | null = null;
   private startedAt: string | null = null;
   private lastScoring: ScoringSummary | null = null;
-  private progress: SyncProgress | null = null;
+  private progress: RefreshProgress | null = null;
   private completedAt: string | null = null;
   private cancelRequested = false;
 
@@ -45,7 +52,7 @@ export class RefreshService {
     this.sources = sources;
   }
 
-  status(): { running: boolean; started_at: string | null; completed_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null; progress: SyncProgress | null } {
+  status(): { running: boolean; started_at: string | null; completed_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null; progress: RefreshProgress | null } {
     return { running: this.running, started_at: this.startedAt, completed_at: this.completedAt, last: this.lastResult, last_error: this.lastError, scoring: this.lastScoring, progress: this.progress };
   }
 
@@ -81,7 +88,9 @@ export class RefreshService {
     const scoring = this.deps.scoring;
     if (!scoring) return;
     const aiAvailable = this.deps.rulesOnly ? false : (await scoring.codex.status()).available;
-    const res = await scoreNeeded(scoring, aiAvailable, this.deps.scoreLimit);
+    const res = await scoreNeeded(scoring, aiAvailable, this.deps.scoreLimit, (done, total) => {
+      this.progress = { phase: 'scoring', done, total, messages: 0 };
+    });
     this.lastScoring = { ai_available: aiAvailable, scored: res.scored, paused: res.paused, errors: res.errors, remaining: res.remaining };
   }
 
@@ -103,7 +112,7 @@ export class RefreshService {
             runner: this.deps.runner,
             logger: this.deps.logger,
             now: this.deps.now,
-            onProgress: (p) => (this.progress = p),
+            onProgress: (p) => (this.progress = { ...p, phase: p.total === 0 && p.done === 0 ? 'searching' : 'downloading' }),
             isCancelled: () => this.cancelRequested,
           },
           syncSource,
@@ -111,6 +120,7 @@ export class RefreshService {
         results.push(result);
         this.lastResult = result;
       }
+      this.progress = { phase: 'processing', done: 0, total: 0, messages: 0 };
       groupNewPostings(this.deps.db, this.deps.aliases, new Date().toISOString());
       await this.scoreAfterIngest();
     } catch (err) {

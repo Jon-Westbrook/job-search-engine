@@ -4,6 +4,7 @@ import type { DirectFilter, Filter, JobsResponse, RefreshStatus, SortKey } from 
 import { APP_CONSTANTS } from '../../shared/types.ts';
 import { clock } from '../format.ts';
 import { UndoToast } from '../common/Toast.tsx';
+import { RefreshDialog } from './RefreshDialog.tsx';
 import { Detail } from './Detail.tsx';
 import { JobList } from './JobList.tsx';
 import { useSmallScreen } from '../hooks.ts';
@@ -52,6 +53,9 @@ export function Inbox(props: {
   const [toast, setToast] = useState<{ jobId: number; message: string } | null>(null);
   const [collapsing, setCollapsing] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dialogHidden, setDialogHidden] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const wasRunning = useRef(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   // Keep the filters in the URL so they survive a reload.
@@ -95,6 +99,19 @@ export function Inbox(props: {
 
   const running = status?.running ?? false;
   useEffect(() => {
+    if (running) {
+      wasRunning.current = true;
+      setDialogHidden(false);
+    } else if (wasRunning.current) {
+      wasRunning.current = false;
+      setCancelling(false);
+      const s = status?.scoring;
+      const c = status?.last?.counts;
+      if (c) props.onNotice(`Refresh finished. ${c.inserted ?? 0} new postings, ${s?.scored ?? 0} jobs scored.`);
+    }
+  }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!running) return;
     const t = window.setInterval(async () => {
       const s = await pollRefresh().catch(() => null);
@@ -117,6 +134,11 @@ export function Inbox(props: {
     } finally {
       setBusy(false);
     }
+  };
+
+  const cancelRefresh = async () => {
+    setCancelling(true);
+    await api.post('refresh/cancel', {}).catch(() => undefined);
   };
 
   const startRefresh = async () => {
@@ -383,6 +405,10 @@ export function Inbox(props: {
             headingRef={headingRef}
           />
         </div>
+      )}
+
+      {running && !dialogHidden && (
+        <RefreshDialog progress={status?.progress ?? null} onHide={() => setDialogHidden(true)} onCancel={cancelRefresh} cancelling={cancelling} />
       )}
 
       {toast && <UndoToast message={toast.message} ms={APP_CONSTANTS.undoMs} onUndo={undo} onDone={() => setToast(null)} />}

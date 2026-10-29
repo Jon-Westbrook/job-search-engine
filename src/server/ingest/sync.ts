@@ -51,6 +51,8 @@ export interface SyncProgress {
   messages: number;
 }
 
+export type RefreshPhase = 'searching' | 'downloading' | 'processing' | 'scoring';
+
 export interface SyncDeps {
   db: Db;
   runner: GogRunner;
@@ -110,6 +112,7 @@ export async function runIngestion(deps: SyncDeps, source: SyncSource): Promise<
   }
   const uniqueThreads = [...new Set(threadIds)];
   counts.threads = uniqueThreads.length;
+  deps.onProgress?.({ done: 0, total: uniqueThreads.length, messages: 0 });
 
   let newestReceived: string | null = null;
   let fetchFailed = fatal !== null;
