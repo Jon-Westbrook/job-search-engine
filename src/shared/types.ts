@@ -1,7 +1,7 @@
 // API types shared by the server and the web app. Keep these in step with the routes.
 
 export type Band = 'good' | 'review' | 'low' | 'blocked' | 'unscored';
-export type Filter = 'all' | 'good' | 'review' | 'blocked' | 'applied';
+export type Filter = 'all' | 'good' | 'review' | 'blocked' | 'applied' | 'closed';
 export type Verdict = 'good' | 'maybe' | 'bad';
 export type Confidence = 'high' | 'medium' | 'low';
 export type DirectFilter = 'any' | 'tier1' | 'tier2plus';
@@ -36,6 +36,7 @@ export interface JobListItem {
   blocked: { at: string; reason: string } | null;
   rule_blocked: boolean;
   applied: { date: string | null; reason: string; status: string } | null;
+  closed: { at: string; reason: string } | null;
   possible_duplicate: boolean;
   source_count: number;
   first_seen: string;

@@ -189,6 +189,16 @@ export function Detail(props: DetailProps) {
           <strong>Blocked.</strong> {job.blocked.reason}
         </div>
       )}
+      {job.closed && (
+        <div className="notice notice-clay" role="status">
+          <strong>Closed on LinkedIn.</strong> {job.closed.reason}. It is hidden from All. A newer alert for this job reopens it automatically.
+          <div className="row-actions">
+            <button type="button" className="btn" onClick={() => run(() => api.post(`jobs/${jobId}/reopen`, {}), 'Reopened.')} disabled={busy}>
+              Reopen
+            </button>
+          </div>
+        </div>
+      )}
       {job.applied && (
         <div className="notice notice-clay" role="status">
           <strong>Already applied</strong>
@@ -327,8 +337,8 @@ export function Detail(props: DetailProps) {
           type="button"
           className="btn btn-dark wide"
           onClick={() => progress(null)}
-          disabled={busy || blocked}
-          aria-disabled={blocked}
+          disabled={busy || blocked || Boolean(job.closed)}
+          aria-disabled={blocked || Boolean(job.closed)}
         >
           {progressLabel}
         </button>
@@ -349,6 +359,19 @@ export function Detail(props: DetailProps) {
           </button>
         )}
       </div>
+
+      {!job.closed && (
+        <div className="lnk">
+          <button
+            type="button"
+            className="linkish"
+            onClick={() => run(() => api.post(`jobs/${jobId}/close`, { reason: 'No longer accepting applications on LinkedIn' }), 'Marked closed. It is hidden from All.')}
+            disabled={busy}
+          >
+            Mark closed on LinkedIn
+          </button>
+        </div>
+      )}
 
       {blockOpen && (
         <div className="stack">
