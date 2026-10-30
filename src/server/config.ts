@@ -16,6 +16,8 @@ export interface Config {
   aliasesPath: string;
   snapshotPath: string;
   scoreMaxPerRefresh: number;
+  targetsPath: string;
+  contactsPath: string;
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
@@ -60,6 +62,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     aliasesPath: resolve(cwd, 'config/company_aliases.json'),
     snapshotPath: resolve(cwd, env.LOG_SNAPSHOT_PATH || 'data/job-log-snapshot.json'),
     scoreMaxPerRefresh: parseLimit(env.SCORE_MAX_PER_REFRESH),
+    targetsPath: resolve(cwd, env.TARGETS_PATH || 'config/targets.local.json'),
+    contactsPath: resolve(cwd, env.CONTACTS_PATH || 'config/contacts.local.json'),
   };
 }
 

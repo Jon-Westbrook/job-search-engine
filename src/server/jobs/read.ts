@@ -30,6 +30,7 @@ export interface JobRow {
   rule_overridden_at: string | null;
   closed_at: string | null;
   closed_reason: string | null;
+  target_name: string | null;
   first_seen: string;
   last_seen: string;
   run_id: number | null;
@@ -57,6 +58,7 @@ latest_verdict AS (
 SELECT j.id, j.title, j.company, j.location, j.arrangement, j.posted_at, j.comp_min, j.comp_max, j.comp_period,
        j.comp_currency, j.comp_annualized, j.canonical_url, j.company_key, j.title_key, j.blocked_at, j.blocked_reason,
        j.rule_blocked, j.rule_block_evidence, j.rule_overridden_at, j.closed_at, j.closed_reason, j.first_seen, j.last_seen,
+       tg.name AS target_name,
        lr.id AS run_id, lr.score, lr.confidence, lr.mode, lr.flags, lr.missing, lr.created_at AS scored_at,
        wp.version AS weight_version,
        lv.verdict AS verdict, lv.reason_tags AS verdict_tags,
@@ -67,6 +69,7 @@ FROM jobs j
 LEFT JOIN latest_run lr ON lr.job_id = j.id
 LEFT JOIN weight_profiles wp ON wp.id = lr.weight_profile_id
 LEFT JOIN latest_verdict lv ON lv.job_id = j.id
+LEFT JOIN targets tg ON tg.company_key = j.company_key
 WHERE EXISTS (SELECT 1 FROM job_sources js WHERE js.job_id = j.id AND js.split_at IS NULL)
 `;
 
@@ -132,6 +135,7 @@ function toItem(db: Db, row: JobRow): JobListItem {
     missing,
     blocked: blockedAt ? { at: blockedAt, reason: row.blocked_reason ?? '' } : null,
     closed: row.closed_at ? { at: row.closed_at, reason: row.closed_reason ?? '' } : null,
+    target: row.target_name,
     rule_blocked: row.rule_blocked === 1,
     // Only a status past Saved counts as applied. A progressed job is Saved and shows In Analysis.
     applied: match && APPLIED_STATUSES.has(match.status) ? { date: match.applied_at, reason: match.reason, status: match.status } : null,
@@ -157,7 +161,7 @@ export function parseList(raw: string | null): string[] {
 export interface ListOptions {
   filter: Filter;
   direct: 'any' | 'tier1' | 'tier2plus';
-  sort: 'score' | 'age' | 'pay' | 'confidence';
+  sort: 'score' | 'age' | 'pay' | 'confidence' | 'targets';
 }
 
 export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; counts: Record<Filter, number> } {
@@ -172,6 +176,7 @@ export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; cou
     blocked: all.filter((j) => j.band === 'blocked').length,
     applied: all.filter((j) => open(j) && Boolean(j.applied)).length,
     closed: all.filter(closedOnly).length,
+    targets: all.filter((j) => open(j) && Boolean(j.target)).length,
   };
   let items = all.filter((j) => {
     if (opts.filter === 'all') return open(j);
@@ -179,6 +184,7 @@ export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; cou
     if (opts.filter === 'review') return open(j) && j.band === 'review';
     if (opts.filter === 'blocked') return j.band === 'blocked';
     if (opts.filter === 'closed') return closedOnly(j);
+    if (opts.filter === 'targets') return open(j) && Boolean(j.target);
     return open(j) && Boolean(j.applied);
   });
   if (opts.direct === 'tier1') items = items.filter((j) => j.direct_tier === 1);
@@ -190,6 +196,7 @@ export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; cou
 function sorter(sort: ListOptions['sort']): (a: JobListItem, b: JobListItem) => number {
   const confRank: Record<string, number> = { high: 3, medium: 2, low: 1 };
   return (a, b) => {
+    if (sort === 'targets') return Number(Boolean(b.target)) - Number(Boolean(a.target)) || (b.score ?? -1) - (a.score ?? -1) || a.id - b.id;
     if (sort === 'score') return (b.score ?? -1) - (a.score ?? -1) || a.id - b.id;
     if (sort === 'age') return Date.parse(b.posted_at ?? '0') - Date.parse(a.posted_at ?? '0') || a.id - b.id;
     if (sort === 'pay') return (b.pay?.max ?? -1) - (a.pay?.max ?? -1) || a.id - b.id;

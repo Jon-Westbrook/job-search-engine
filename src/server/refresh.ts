@@ -15,6 +15,8 @@ export interface RefreshDeps {
   scoring?: ScoringDeps;
   rulesOnly?: boolean;
   scoreLimit?: number;
+  // Re-reads the personal lists (targets and contacts) before each refresh.
+  syncLists?: () => void;
 }
 
 export interface RefreshProgress {
@@ -100,6 +102,7 @@ export class RefreshService {
   private async execute(): Promise<SyncResult[]> {
     const results: SyncResult[] = [];
     try {
+      this.deps.syncLists?.();
       for (const source of this.sources.filter((s) => s.enabled)) {
         const syncSource: SyncSource = {
           id: source.id,
