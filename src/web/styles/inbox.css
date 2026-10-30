@@ -1415,9 +1415,9 @@ textarea {
 
   .panel {
     position: sticky;
-    top: 0;
+    top: 16px;
     align-self: start;
-    max-height: 100dvh;
+    max-height: calc(100dvh - 80px);
     overflow-y: auto;
   }
 
