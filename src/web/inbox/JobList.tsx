@@ -7,6 +7,7 @@ export function flagTags(job: JobListItem): Array<{ text: string; tone: string }
   const tags: Array<{ text: string; tone: string }> = [];
   if (job.rule_blocked) tags.push({ text: 'Blocked by rule', tone: 'red' });
   else if (job.blocked) tags.push({ text: 'Blocked', tone: 'red' });
+  if (job.target) tags.push({ text: `Target: ${job.target}`, tone: 'dir' });
   if (job.applied) tags.push({ text: `Applied ${job.applied.date ?? ''}`.trim(), tone: 'yel' });
   else if (job.in_analysis) tags.push({ text: 'In Analysis', tone: 'dir' });
   if (job.possible_duplicate) tags.push({ text: 'Possible duplicate', tone: 'yel' });

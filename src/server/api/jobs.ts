@@ -47,7 +47,8 @@ function jobId(params: Record<string, string>): number {
   return id;
 }
 
-const FILTERS: Filter[] = ['all', 'good', 'review', 'blocked', 'applied', 'closed'];
+const FILTERS: Filter[] = ['all', 'good', 'review', 'blocked', 'applied', 'closed', 'targets'];
+const SORTS = ['score', 'age', 'pay', 'confidence', 'targets'] as const;
 
 export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
   const { db } = deps;
@@ -57,8 +58,9 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     const filter = (url.searchParams.get('filter') ?? 'all') as Filter;
     if (!FILTERS.includes(filter)) throw new HttpError(400, 'Unknown filter', 'bad_request');
     const direct = (url.searchParams.get('direct') ?? 'any') as 'any' | 'tier1' | 'tier2plus';
-    const sort = (url.searchParams.get('sort') ?? 'score') as 'score' | 'age' | 'pay' | 'confidence';
-    const result = listJobs(db, { filter, direct, sort });
+    const sortParam = url.searchParams.get('sort') ?? 'score';
+    if (!(SORTS as readonly string[]).includes(sortParam)) throw new HttpError(400, 'Unknown sort', 'bad_request');
+    const result = listJobs(db, { filter, direct, sort: sortParam as (typeof SORTS)[number] });
     sendJson(res, 200, { items: result.items, counts: result.counts });
   });
 

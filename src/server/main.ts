@@ -12,6 +12,7 @@ import { RefreshService } from './refresh.ts';
 import { loadAliases } from './normalize/aliases.ts';
 import { createCodexRunner } from './score/codex.ts';
 import { seedWeightProfile } from './score/profile.ts';
+import { loadTargetFile, syncContactsFromFile, syncTargets } from './lists.ts';
 import { scoreJob } from './score/service.ts';
 
 const config = loadConfig();
@@ -34,6 +35,14 @@ const runner = createGogRunner({
 });
 const aliases = loadAliases(config.aliasesPath, config.aliasesPath.replace(/\.json$/, '.local.json'));
 seedWeightProfile(db, new Date().toISOString());
+// The personal lists load at startup and again on each refresh.
+const syncLists = (): void => {
+  const nowIso = new Date().toISOString();
+  const targets = syncTargets(db, loadTargetFile(config.targetsPath), aliases, nowIso);
+  const contacts = syncContactsFromFile(db, config.contactsPath, aliases, nowIso);
+  logger.info('personal lists synced', { targets, contacts });
+};
+syncLists();
 const codex = createCodexRunner({
   bin: config.codex.bin,
   model: config.codex.model,
@@ -42,7 +51,7 @@ const codex = createCodexRunner({
 });
 const profileForScoring = profile;
 const scoring = { db, codex, logger, now: () => new Date(), aliases, profile: profileForScoring };
-const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly, scoreLimit: config.scoreMaxPerRefresh }, sources);
+const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly, scoreLimit: config.scoreMaxPerRefresh, syncLists }, sources);
 
 const rescore = async (jobId: number): Promise<void> => {
   const aiAvailable = !config.codex.rulesOnly && (await codex.status()).available;

@@ -1,0 +1,5 @@
+{
+  "contacts": [
+    { "name": "Example Person", "company": "Example Agency", "relationship": "friend", "channel": "email" }
+  ]
+}

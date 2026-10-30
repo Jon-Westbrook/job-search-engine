@@ -16,10 +16,11 @@ const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'blocked', label: 'Blocked' },
   { key: 'applied', label: 'Applied' },
   { key: 'closed', label: 'Closed' },
+  { key: 'targets', label: 'Targets' },
 ];
-const SORTS: SortKey[] = ['score', 'age', 'pay', 'confidence'];
+const SORTS: SortKey[] = ['score', 'age', 'pay', 'confidence', 'targets'];
 const DIRECTS: DirectFilter[] = ['any', 'tier1', 'tier2plus'];
-const SORT_LABEL: Record<SortKey, string> = { score: 'score', age: 'age', pay: 'pay', confidence: 'confidence' };
+const SORT_LABEL: Record<SortKey, string> = { score: 'score', age: 'age', pay: 'pay', confidence: 'confidence', targets: 'targets first' };
 const DIRECT_LABEL: Record<DirectFilter, string> = { any: 'any', tier1: 'tier 1', tier2plus: 'tier 2 or higher' };
 
 interface Stats {
@@ -43,7 +44,7 @@ export function Inbox(props: {
   aiNeedsAttention: boolean;
 }) {
   const small = useSmallScreen();
-  const [filter, setFilter] = useState<Filter>(() => readParam('filter', ['all', 'good', 'review', 'blocked', 'applied', 'closed'] as const, 'all'));
+  const [filter, setFilter] = useState<Filter>(() => readParam('filter', ['all', 'good', 'review', 'blocked', 'applied', 'closed', 'targets'] as const, 'all'));
   const [sort, setSort] = useState<SortKey>(() => readParam('sort', SORTS, 'score'));
   const [direct, setDirect] = useState<DirectFilter>(() => readParam('direct', DIRECTS, 'any'));
   const [data, setData] = useState<JobsResponse | null>(null);
@@ -212,7 +213,7 @@ export function Inbox(props: {
   }, [selectedId, small]);
 
   const lastRefreshText = status?.completed_at ? clock(status.completed_at) : null;
-  const counts = data?.counts ?? { all: 0, good: 0, review: 0, blocked: 0, applied: 0, closed: 0 };
+  const counts = data?.counts ?? { all: 0, good: 0, review: 0, blocked: 0, applied: 0, closed: 0, targets: 0 };
   const filtersOn = filter !== 'all' || direct !== 'any';
   const emptyText = `Nothing new since ${lastRefreshText ?? 'the first refresh'}.`;
   const clearFilters = () => {

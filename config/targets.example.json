@@ -1,0 +1,6 @@
+{
+  "targets": [
+    "Example Agency",
+    { "name": "Example Shop", "group": "Example Group" }
+  ]
+}
