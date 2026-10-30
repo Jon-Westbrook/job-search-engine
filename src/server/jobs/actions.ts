@@ -20,6 +20,7 @@ export class ActionError extends Error {
 
 interface JobRow {
   id: number;
+  closed_at: string | null;
   canonical_url: string;
   company_key: string | null;
   title_key: string | null;
@@ -87,6 +88,41 @@ export function overrideBlock(db: Db, jobId: number, reason: string, nowIso: str
     JSON.stringify({ reason: reason.trim(), was_user_block: Boolean(job.blocked_at), was_rule_block: Boolean(job.rule_blocked) }),
     nowIso,
   );
+}
+
+// Closed on LinkedIn: the application window has ended. Kept with its history. Not a block.
+export function closeJob(db: Db, jobId: number, reason: string, nowIso: string): void {
+  const job = requireJob(db, jobId);
+  if (job.closed_at) throw new ActionError(409, 'This job is already closed');
+  const why = reason.trim() || 'No longer accepting applications on LinkedIn';
+  db.prepare('UPDATE jobs SET closed_at = ?, closed_reason = ? WHERE id = ?').run(nowIso, why, jobId);
+  db.prepare(`INSERT INTO job_events (job_id, type, payload, created_at) VALUES (?, 'closed', ?, ?)`).run(jobId, JSON.stringify({ reason: why }), nowIso);
+}
+
+export function reopenJob(db: Db, jobId: number, nowIso: string, relistedAt: string | null = null): void {
+  const job = requireJob(db, jobId);
+  if (!job.closed_at) throw new ActionError(409, 'This job is not closed');
+  db.prepare('UPDATE jobs SET closed_at = NULL, closed_reason = NULL WHERE id = ?').run(jobId);
+  db.prepare(`INSERT INTO job_events (job_id, type, payload, created_at) VALUES (?, 'reopened', ?, ?)`).run(
+    jobId,
+    JSON.stringify({ relisted_at: relistedAt }),
+    nowIso,
+  );
+}
+
+// A listing shown by an alert received after the job was closed means it is open again.
+// Old alert emails re-read by a later refresh are older than the close, so they do not reopen it.
+export function reopenIfRelisted(db: Db, postingId: number, receivedAt: string, nowIso: string): void {
+  const rows = db
+    .prepare(
+      `SELECT j.id, j.closed_at FROM jobs j
+       JOIN job_sources js ON js.job_id = j.id AND js.split_at IS NULL
+       WHERE js.posting_id = ? AND j.closed_at IS NOT NULL`,
+    )
+    .all(postingId) as Array<{ id: number; closed_at: string }>;
+  for (const row of rows) {
+    if (receivedAt > row.closed_at) reopenJob(db, row.id, nowIso, receivedAt);
+  }
 }
 
 export function openListing(db: Db, jobId: number, nowIso: string): string {

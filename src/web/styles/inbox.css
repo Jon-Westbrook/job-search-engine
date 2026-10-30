@@ -294,6 +294,7 @@
 }
 
 .panel {
+  position: relative;
   background: var(--panel);
   border-right: var(--border);
   padding: 28px;
@@ -1367,4 +1368,38 @@ textarea {
   .stripes > i {
     animation: none;
   }
+}
+
+/* Close X (top right of the panel and the phone sheet) */
+
+.panel-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  font: 700 26px/1 var(--font-sans);
+  background: var(--ground);
+  color: var(--cream);
+  border: var(--border);
+  cursor: pointer;
+}
+
+.panel-x:hover {
+  background: var(--raise);
+}
+
+.sheet-back {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.sheet-x {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font: 700 26px/1 var(--font-sans);
 }

@@ -4,6 +4,7 @@ import { getThreadMessages, searchThreads, type AlertMessage } from '../gog/gmai
 import type { GogRunner } from '../gog/wrapper.ts';
 import { parseLinkedInAlert } from './linkedin.ts';
 import { getCursor, setCursor, upsertPosting } from './store.ts';
+import { reopenIfRelisted } from '../jobs/actions.ts';
 
 const DAY_MS = 86_400_000;
 const MAX_PAGES = 50;
@@ -190,7 +191,8 @@ function handleMessage(
   }
   for (const posting of parsed.postings) {
     counts.postings++;
-    const { outcome } = upsertPosting(db, posting, nowIso, source.parser_version);
+    const { outcome, postingId } = upsertPosting(db, posting, nowIso, source.parser_version);
+    reopenIfRelisted(db, postingId, posting.alertReceivedAt, nowIso);
     if (outcome === 'inserted') counts.inserted++;
     else if (outcome === 'updated') counts.updated++;
     else counts.unchanged++;

@@ -2,7 +2,7 @@ import { BLOCK_UNDO_WINDOW_MS } from '../../shared/app.ts';
 import type { Db } from '../db/index.ts';
 import type { Logger } from '../log.ts';
 import { HttpError, type Router, type RouteHandler, sendJson } from '../http/router.ts';
-import { ActionError, blockJob, mergeJobs, openListing, overrideBlock, setDescription, setVerdict, splitPosting, undoBlock } from '../jobs/actions.ts';
+import { ActionError, blockJob, closeJob, mergeJobs, openListing, reopenJob, overrideBlock, setDescription, setVerdict, splitPosting, undoBlock } from '../jobs/actions.ts';
 import { jobDetail, listJobs, stats, type Filter } from '../jobs/read.ts';
 import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
 import { ContactError, createContact } from '../contacts.ts';
@@ -47,7 +47,7 @@ function jobId(params: Record<string, string>): number {
   return id;
 }
 
-const FILTERS: Filter[] = ['all', 'good', 'review', 'blocked', 'applied'];
+const FILTERS: Filter[] = ['all', 'good', 'review', 'blocked', 'applied', 'closed'];
 
 export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
   const { db } = deps;
@@ -81,11 +81,12 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
   router.post('/jobs/:id/progress', guard(async ({ res, params, json }) => {
     const body = await json<{ reason?: string | null }>().catch(() => ({} as { reason?: string | null }));
     const id = jobId(params);
-    const job = db.prepare('SELECT id, canonical_url, title, company, company_key, title_key, blocked_at, rule_blocked FROM jobs WHERE id = ?').get(id) as
-      | { id: number; canonical_url: string; title: string; company: string | null; company_key: string | null; title_key: string | null; blocked_at: string | null; rule_blocked: number }
+    const job = db.prepare('SELECT id, canonical_url, title, company, company_key, title_key, blocked_at, rule_blocked, closed_at FROM jobs WHERE id = ?').get(id) as
+      | { id: number; canonical_url: string; title: string; company: string | null; company_key: string | null; title_key: string | null; blocked_at: string | null; rule_blocked: number; closed_at: string | null }
       | undefined;
     if (!job) throw new HttpError(404, 'Job not found', 'not_found');
     if (job.blocked_at || job.rule_blocked) throw new HttpError(409, 'A blocked job cannot be progressed. Override it first.', 'conflict');
+    if (job.closed_at) throw new HttpError(409, 'This job is closed on LinkedIn. It can be progressed again if it is relisted.', 'conflict');
     const out = progressJob(db, job, { reason: body.reason ?? null, scoreVersion: deps.scoreVersionOf(id), nowIso: nowIso(), aliases: deps.aliases });
     sendJson(res, 200, { application_id: out.applicationId, stage: 'analysis', button: 'Saved to Analysis' });
   }));
@@ -104,6 +105,17 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
   router.post('/jobs/:id/override', guard(async ({ res, params, json }) => {
     const body = await json<{ reason?: string }>();
     overrideBlock(db, jobId(params), String(body.reason ?? ''), nowIso());
+    sendJson(res, 200, { ok: true });
+  }));
+
+  router.post('/jobs/:id/close', guard(async ({ res, params, json }) => {
+    const body = await json<{ reason?: string }>().catch(() => ({} as { reason?: string }));
+    closeJob(db, jobId(params), String(body.reason ?? ''), nowIso());
+    sendJson(res, 200, { ok: true });
+  }));
+
+  router.post('/jobs/:id/reopen', guard(({ res, params }) => {
+    reopenJob(db, jobId(params), nowIso());
     sendJson(res, 200, { ok: true });
   }));
 

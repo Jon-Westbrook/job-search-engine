@@ -27,6 +27,8 @@ export interface JobRow {
   rule_blocked: number;
   rule_block_evidence: string | null;
   rule_overridden_at: string | null;
+  closed_at: string | null;
+  closed_reason: string | null;
   first_seen: string;
   last_seen: string;
   run_id: number | null;
@@ -53,7 +55,7 @@ latest_verdict AS (
 )
 SELECT j.id, j.title, j.company, j.location, j.arrangement, j.posted_at, j.comp_min, j.comp_max, j.comp_period,
        j.comp_currency, j.comp_annualized, j.canonical_url, j.company_key, j.title_key, j.blocked_at, j.blocked_reason,
-       j.rule_blocked, j.rule_block_evidence, j.rule_overridden_at, j.first_seen, j.last_seen,
+       j.rule_blocked, j.rule_block_evidence, j.rule_overridden_at, j.closed_at, j.closed_reason, j.first_seen, j.last_seen,
        lr.id AS run_id, lr.score, lr.confidence, lr.mode, lr.flags, lr.missing, lr.created_at AS scored_at,
        wp.version AS weight_version,
        lv.verdict AS verdict, lv.reason_tags AS verdict_tags,
@@ -124,6 +126,7 @@ function toItem(db: Db, row: JobRow): JobListItem {
     flags,
     missing,
     blocked: blockedAt ? { at: blockedAt, reason: row.blocked_reason ?? '' } : null,
+    closed: row.closed_at ? { at: row.closed_at, reason: row.closed_reason ?? '' } : null,
     rule_blocked: row.rule_blocked === 1,
     applied: match ? { date: match.applied_at, reason: match.reason, status: match.status } : null,
     possible_duplicate: weakMatchesFor(db, row.id).length > 0,
@@ -152,19 +155,24 @@ export interface ListOptions {
 
 export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; counts: Record<Filter, number> } {
   const all = loadJobRows(db).map((row) => toItem(db, row));
+  // Open means not blocked, not rule-blocked, and not closed on LinkedIn.
+  const open = (j: JobListItem) => !j.blocked && !j.rule_blocked && !j.closed;
+  const closedOnly = (j: JobListItem) => Boolean(j.closed) && !j.blocked && !j.rule_blocked;
   const counts: Record<Filter, number> = {
-    all: all.filter((j) => !j.blocked && !j.rule_blocked).length,
-    good: all.filter((j) => j.band === 'good').length,
-    review: all.filter((j) => j.band === 'review').length,
+    all: all.filter(open).length,
+    good: all.filter((j) => open(j) && j.band === 'good').length,
+    review: all.filter((j) => open(j) && j.band === 'review').length,
     blocked: all.filter((j) => j.band === 'blocked').length,
-    applied: all.filter((j) => j.applied && !j.blocked && !j.rule_blocked).length,
+    applied: all.filter((j) => open(j) && Boolean(j.applied)).length,
+    closed: all.filter(closedOnly).length,
   };
   let items = all.filter((j) => {
-    if (opts.filter === 'all') return !j.blocked && !j.rule_blocked;
-    if (opts.filter === 'good') return j.band === 'good';
-    if (opts.filter === 'review') return j.band === 'review';
+    if (opts.filter === 'all') return open(j);
+    if (opts.filter === 'good') return open(j) && j.band === 'good';
+    if (opts.filter === 'review') return open(j) && j.band === 'review';
     if (opts.filter === 'blocked') return j.band === 'blocked';
-    return Boolean(j.applied) && !j.blocked && !j.rule_blocked;
+    if (opts.filter === 'closed') return closedOnly(j);
+    return open(j) && Boolean(j.applied);
   });
   if (opts.direct === 'tier1') items = items.filter((j) => j.direct_tier === 1);
   if (opts.direct === 'tier2plus') items = items.filter((j) => j.direct_tier >= 1 && j.direct_tier <= 2);

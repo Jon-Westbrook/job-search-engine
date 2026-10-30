@@ -15,6 +15,7 @@ const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'review', label: 'Review' },
   { key: 'blocked', label: 'Blocked' },
   { key: 'applied', label: 'Applied' },
+  { key: 'closed', label: 'Closed' },
 ];
 const SORTS: SortKey[] = ['score', 'age', 'pay', 'confidence'];
 const DIRECTS: DirectFilter[] = ['any', 'tier1', 'tier2plus'];
@@ -42,7 +43,7 @@ export function Inbox(props: {
   aiNeedsAttention: boolean;
 }) {
   const small = useSmallScreen();
-  const [filter, setFilter] = useState<Filter>(() => readParam('filter', ['all', 'good', 'review', 'blocked', 'applied'] as const, 'all'));
+  const [filter, setFilter] = useState<Filter>(() => readParam('filter', ['all', 'good', 'review', 'blocked', 'applied', 'closed'] as const, 'all'));
   const [sort, setSort] = useState<SortKey>(() => readParam('sort', SORTS, 'score'));
   const [direct, setDirect] = useState<DirectFilter>(() => readParam('direct', DIRECTS, 'any'));
   const [data, setData] = useState<JobsResponse | null>(null);
@@ -211,7 +212,7 @@ export function Inbox(props: {
   }, [selectedId, small]);
 
   const lastRefreshText = status?.completed_at ? clock(status.completed_at) : null;
-  const counts = data?.counts ?? { all: 0, good: 0, review: 0, blocked: 0, applied: 0 };
+  const counts = data?.counts ?? { all: 0, good: 0, review: 0, blocked: 0, applied: 0, closed: 0 };
   const filtersOn = filter !== 'all' || direct !== 'any';
   const emptyText = `Nothing new since ${lastRefreshText ?? 'the first refresh'}.`;
   const clearFilters = () => {
@@ -355,6 +356,9 @@ export function Inbox(props: {
       <div className={`split${showSplit ? ' has-panel' : ''}`}>
         {showSplit && selectedId !== null && (
           <aside className="panel" aria-label="Selected job">
+            <button type="button" className="panel-x" aria-label="Close panel" title="Close panel" onClick={closeSelection}>
+              ×
+            </button>
             <Detail
               jobId={selectedId}
               onChanged={load}
@@ -394,6 +398,9 @@ export function Inbox(props: {
           <div className="sheet-back">
             <button type="button" className="btn" onClick={closeSelection}>
               Back to list
+            </button>
+            <button type="button" className="btn btn-dark sheet-x" aria-label="Close" title="Close" onClick={closeSelection}>
+              ×
             </button>
           </div>
           <Detail
