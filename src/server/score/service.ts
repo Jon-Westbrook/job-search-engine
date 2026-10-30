@@ -4,7 +4,8 @@ import { directTierFor } from '../contacts.ts';
 import { findApplicationMatch } from '../applications.ts';
 import { weakMatchesFor } from '../grouping.ts';
 import { normalizeCompany } from '../normalize/keys.ts';
-import { buildPrompt, PROMPT_VERSION, validateExtraction } from './extract.ts';
+import { buildBatchPrompt, BATCH_SIZE, validateBatch, type BatchItemResult } from './extract.ts';
+import { PROMPT_VERSION } from './extract.ts';
 import type { CodexRunner } from './codex.ts';
 import { activeWeightProfile } from './profile.ts';
 import { scoreListing, type Extraction, type ScoreOutput } from './rules.ts';
@@ -48,7 +49,53 @@ interface JobRow {
 
 // Scores one job. The AI extracts factor values. The deterministic scorer computes the
 // score. If the provider fails, scoring pauses and nothing is written for this job.
-export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: boolean): Promise<ScoreOutcome> {
+export const BATCH_CONCURRENCY = 3;
+
+// The AI answer for one job: validated factor values, or the reason they could not be used.
+export type AiResult = { extraction: Extraction } | { invalid: string };
+
+function promptRow(db: Db, jobId: number) {
+  const job = db.prepare('SELECT title, company, location, arrangement FROM jobs WHERE id = ?').get(jobId) as
+    | { title: string; company: string | null; location: string | null; arrangement: string | null }
+    | undefined;
+  if (!job) return null;
+  const description = (db.prepare('SELECT text FROM job_descriptions WHERE job_id = ? ORDER BY id DESC LIMIT 1').get(jobId) as { text: string } | undefined)?.text ?? null;
+  return { jobId, title: job.title, company: job.company, location: job.location, arrangement: job.arrangement, description };
+}
+
+// One call for several jobs. A provider failure returns an error, which pauses scoring. Output
+// that breaks the schema, or has no entry for a job, gives only that job rules-only scoring.
+export async function extractBatch(
+  deps: ScoringDeps,
+  jobIds: number[],
+): Promise<{ ok: true; results: Map<number, AiResult> } | { ok: false; error: string }> {
+  const items = jobIds.map((id) => promptRow(deps.db, id)).filter((row): row is NonNullable<typeof row> => row !== null);
+  const prompt = buildBatchPrompt(deps.profile.resume_summary ?? '', items);
+  const call = await deps.codex.extractBatch(prompt);
+  if (!call.ok) {
+    deps.logger.warn('ai extraction failed; scoring paused', { jobs: jobIds.length, error: call.error });
+    return { ok: false, error: call.error };
+  }
+  const checked = validateBatch(call.json);
+  const results = new Map<number, AiResult>();
+  for (const id of jobIds) {
+    const invalid = { invalid: 'AI output did not match the schema, so this score uses rules only' };
+    if (!checked.ok) {
+      results.set(id, invalid);
+      continue;
+    }
+    const item: BatchItemResult | undefined = checked.items.get(id);
+    if (!item) results.set(id, { invalid: 'AI returned no entry for this job, so this score uses rules only' });
+    else if (item.ok) results.set(id, { extraction: item.value });
+    else results.set(id, invalid);
+  }
+  if (!checked.ok) deps.logger.warn('ai batch output rejected by schema', { errors: checked.errors });
+  return { ok: true, results };
+}
+
+// Scores one job. The batch result is passed in by scoreNeeded. A bare call (for example a
+// rescore after a pasted description) runs a batch of one.
+export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: boolean, preset?: AiResult | null): Promise<ScoreOutcome> {
   const { db } = deps;
   const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId) as unknown as JobRow | undefined;
   if (!job) return { status: 'paused', jobId, error: 'Job not found' };
@@ -78,34 +125,18 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
   const match = findApplicationMatch(db, { id: job.id, canonical_url: job.canonical_url, company_key: job.company_key, title_key: job.title_key });
   const weak = weakMatchesFor(db, jobId).length > 0;
 
-  // AI extraction, if available. Provider failure pauses. Output that breaks the schema
-  // falls back to rules-only for this job and says so.
+  // AI extraction: the batch result from scoreNeeded, or a batch of one for a bare call.
   let extraction: Extraction | null = null;
   let extractionFlag: string | null = null;
-  let tokens: { in: number | null; out: number | null } = { in: null, out: null };
-  if (aiAvailable) {
-    const prompt = buildPrompt({
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      arrangement: job.arrangement,
-      description,
-      resumeSummary: resume,
-    });
-    const call = await deps.codex.extract(prompt);
-    if (!call.ok) {
-      deps.logger.warn('ai extraction failed; scoring paused', { job_id: jobId, error: call.error });
-      return { status: 'paused', jobId, error: call.error };
-    }
-    const checked = validateExtraction(call.json);
-    if (checked.ok) {
-      extraction = checked.value;
-      tokens = { in: call.tokensIn, out: call.tokensOut };
-    } else {
-      extractionFlag = 'AI output did not match the schema, so this score uses rules only';
-      deps.logger.warn('ai output rejected by schema', { job_id: jobId, errors: checked.errors });
-    }
+  const tokens = { in: null as number | null, out: null as number | null };
+  let ai: AiResult | null = preset ?? null;
+  if (preset === undefined && aiAvailable) {
+    const batch = await extractBatch(deps, [jobId]);
+    if (!batch.ok) return { status: 'paused', jobId, error: batch.error };
+    ai = batch.results.get(jobId) ?? null;
   }
+  if (ai && 'extraction' in ai) extraction = ai.extraction;
+  if (ai && 'invalid' in ai) extractionFlag = ai.invalid;
 
   const postedAt = job.posted_at;
   const output: ScoreOutput = scoreListing({
@@ -207,6 +238,14 @@ export function jobsNeedingScore(db: Db, limit = Number.MAX_SAFE_INTEGER): numbe
   return rows.map((r) => r.id);
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+// Scores every job that needs it. Jobs go in batches of BATCH_SIZE, with up to BATCH_CONCURRENCY
+// calls running at once. A failed call pauses scoring. Jobs scored before it stay scored.
 export async function scoreNeeded(
   deps: ScoringDeps,
   aiAvailable: boolean,
@@ -216,15 +255,29 @@ export async function scoreNeeded(
   let scored = 0;
   const errors: string[] = [];
   const ids = jobsNeedingScore(deps.db, limit);
+  const remaining = () => jobsNeedingScore(deps.db).length;
   onProgress?.(0, ids.length);
-  for (const jobId of ids) {
-    const outcome = await scoreJob(deps, jobId, aiAvailable);
-    if (outcome.status === 'paused') {
-      errors.push(outcome.error);
-      return { scored, paused: true, errors, remaining: jobsNeedingScore(deps.db).length };
+  const batches = chunk(ids, BATCH_SIZE);
+  for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
+    const group = batches.slice(i, i + BATCH_CONCURRENCY);
+    const calls = aiAvailable ? await Promise.all(group.map((batch) => extractBatch(deps, batch))) : null;
+    for (const [g, batch] of group.entries()) {
+      const call = calls?.[g];
+      if (call && !call.ok) {
+        errors.push(call.error);
+        return { scored, paused: true, errors, remaining: remaining() };
+      }
+      for (const jobId of batch) {
+        const preset: AiResult | null = call && call.ok ? (call.results.get(jobId) ?? null) : null;
+        const outcome = await scoreJob(deps, jobId, aiAvailable, preset);
+        if (outcome.status === 'paused') {
+          errors.push(outcome.error);
+          return { scored, paused: true, errors, remaining: remaining() };
+        }
+        scored++;
+        onProgress?.(scored, ids.length);
+      }
     }
-    scored++;
-    onProgress?.(scored, ids.length);
   }
-  return { scored, paused: false, errors, remaining: jobsNeedingScore(deps.db).length };
+  return { scored, paused: false, errors, remaining: remaining() };
 }

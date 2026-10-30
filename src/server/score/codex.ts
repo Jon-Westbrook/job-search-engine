@@ -2,7 +2,7 @@ import { execFile, spawn as execFileSpawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { EXTRACTION_SCHEMA } from './extract.ts';
+import { BATCH_EXTRACTION_SCHEMA } from './extract.ts';
 
 // Runs the Codex CLI with the ChatGPT sign-in already stored for it. The pattern follows
 // the other apps on the host: read-only sandbox, ephemeral session, strict output schema.
@@ -24,7 +24,7 @@ export interface ExtractCall {
 
 export interface CodexRunner {
   status(): Promise<CodexStatus>;
-  extract(prompt: string): Promise<ExtractCall | { ok: false; error: string }>;
+  extractBatch(prompt: string): Promise<ExtractCall | { ok: false; error: string }>;
   readonly model: string;
   readonly reasoningEffort: string;
 }
@@ -51,6 +51,48 @@ export interface CodexOptions {
 
 export function createCodexRunner(opts: CodexOptions): CodexRunner {
   const exec = opts.exec ?? defaultExec;
+
+  // One structured call. The schema goes to a temp file, and the answer is read back from one.
+  const run = async (prompt: string, schema: object): Promise<ExtractCall | { ok: false; error: string }> => {
+    const dir = mkdtempSync(join(tmpdir(), 'jse-codex-'));
+    try {
+      const schemaPath = join(dir, 'schema.json');
+      const outPath = join(dir, 'output.json');
+      writeFileSync(schemaPath, JSON.stringify(schema));
+      const args = [
+        'exec',
+        '--ephemeral',
+        '--ignore-rules',
+        '--sandbox',
+        'read-only',
+        '--skip-git-repo-check',
+        '--model',
+        opts.model,
+        '--config',
+        `model_reasoning_effort="${opts.reasoningEffort}"`,
+        '--output-schema',
+        schemaPath,
+        '--output-last-message',
+        outPath,
+        '--cd',
+        dir,
+        '-',
+      ];
+      const res = await exec(opts.bin, args, prompt, opts.timeoutMs);
+      if (res.timedOut) return { ok: false, error: 'The AI provider timed out' };
+      if (res.code !== 0) return { ok: false, error: `The AI provider failed (exit ${res.code})` };
+      let json: unknown;
+      try {
+        json = JSON.parse(readFileSync(outPath, 'utf8'));
+      } catch {
+        return { ok: false, error: 'The AI provider did not return JSON' };
+      }
+      return { ok: true, json, model: opts.model, reasoningEffort: opts.reasoningEffort, tokensIn: null, tokensOut: null };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
   return {
     model: opts.model,
     reasoningEffort: opts.reasoningEffort,
@@ -62,45 +104,7 @@ export function createCodexRunner(opts: CodexOptions): CodexRunner {
       return { available: false, detail: 'Not signed in to ChatGPT for the Codex CLI' };
     },
 
-    async extract(prompt: string) {
-      const dir = mkdtempSync(join(tmpdir(), 'jse-codex-'));
-      try {
-        const schemaPath = join(dir, 'schema.json');
-        const outPath = join(dir, 'output.json');
-        writeFileSync(schemaPath, JSON.stringify(EXTRACTION_SCHEMA));
-        const args = [
-          'exec',
-          '--ephemeral',
-          '--ignore-rules',
-          '--sandbox',
-          'read-only',
-          '--skip-git-repo-check',
-          '--model',
-          opts.model,
-          '--config',
-          `model_reasoning_effort="${opts.reasoningEffort}"`,
-          '--output-schema',
-          schemaPath,
-          '--output-last-message',
-          outPath,
-          '--cd',
-          dir,
-          '-',
-        ];
-        const res = await exec(opts.bin, args, prompt, opts.timeoutMs);
-        if (res.timedOut) return { ok: false, error: 'The AI provider timed out' };
-        if (res.code !== 0) return { ok: false, error: `The AI provider failed (exit ${res.code})` };
-        let json: unknown;
-        try {
-          json = JSON.parse(readFileSync(outPath, 'utf8'));
-        } catch {
-          return { ok: false, error: 'The AI provider did not return JSON' };
-        }
-        return { ok: true, json, model: opts.model, reasoningEffort: opts.reasoningEffort, tokensIn: null, tokensOut: null };
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    },
+    extractBatch: (prompt) => run(prompt, BATCH_EXTRACTION_SCHEMA),
   };
 }
 
