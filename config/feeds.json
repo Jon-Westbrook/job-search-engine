@@ -1,0 +1,9 @@
+{
+  "feeds": [
+    { "id": "greenhouse-vml", "provider": "greenhouse", "board": "wundermanthompson", "label": "VML", "enabled": true },
+    { "id": "greenhouse-mozilla", "provider": "greenhouse", "board": "mozilla", "label": "Mozilla", "enabled": true },
+    { "id": "greenhouse-wpp", "provider": "greenhouse", "board": "wpp", "label": "WPP", "enabled": true },
+    { "id": "greenhouse-rga", "provider": "greenhouse", "board": "rga", "label": "R/GA", "enabled": true },
+    { "id": "greenhouse-headspace", "provider": "greenhouse", "board": "hs", "label": "Headspace", "enabled": true }
+  ]
+}
