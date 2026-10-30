@@ -33,6 +33,8 @@ export interface ScoreInput {
   location: string | null;
   arrangement: 'onsite' | 'hybrid' | 'remote' | null;
   postedAt: string | null;
+  // True when postedAt is the earliest alert date, not a posting time the listing stated.
+  postedEstimated?: boolean;
   pay: { min: number; max: number; currency: string; annualized: boolean } | null;
   easyApply: boolean;
   directTier: 0 | 1 | 2 | 3;
@@ -217,13 +219,14 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     const pts = ageDays <= full_days ? 10 : ageDays >= zero_days ? 0 : (10 * (zero_days - ageDays)) / (zero_days - full_days);
     factors.push({
       factor: 'Recency',
-      aiValue: `${Math.round(ageDays * 10) / 10} days old`,
+      aiValue: `${Math.round(ageDays * 10) / 10} days old${input.postedEstimated ? ' (estimated from alert date)' : ''}`,
       points: scale(Math.round(pts), w.recency, d.recency),
       max: w.recency,
       evidence: [],
       sourceField: 'posted_at',
-      confidence: 'high',
+      confidence: input.postedEstimated ? 'medium' : 'high',
     });
+    if (input.postedEstimated) flags.push('Posting time estimated from the alert date');
   } else {
     missing.push('posting time');
     factors.push({ factor: 'Recency', aiValue: 'unknown', points: scale(5, w.recency, d.recency), max: w.recency, evidence: [], sourceField: null, confidence: 'low' });

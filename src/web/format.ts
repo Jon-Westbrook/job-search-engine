@@ -21,6 +21,12 @@ export function postedLabel(iso: string | null, now = Date.now()): string {
   return shortDate(iso);
 }
 
+// Estimated times (from the alert date) carry a suffix, so they are never read as stated.
+export function postedText(job: { posted_at: string | null; posted_estimated: boolean }): string {
+  const label = postedLabel(job.posted_at);
+  return job.posted_estimated ? `${label} est.` : label;
+}
+
 export function postedFull(iso: string | null): string {
   if (!iso) return 'Posting time not stated';
   return `Posted ${shortDate(iso)}`;
