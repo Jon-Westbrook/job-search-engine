@@ -2,6 +2,7 @@ import type { Db } from '../db/index.ts';
 import { findApplicationMatch, type ApplicationMatch } from '../applications.ts';
 import { weakMatchesFor } from '../grouping.ts';
 import { GOOD_FIT_THRESHOLD, REVIEW_THRESHOLD } from '../../shared/app.ts';
+import { earliestAlertAt } from './posted.ts';
 import type { Band, Confidence, Filter, JobListItem, Verdict } from '../../shared/types.ts';
 
 export type { Band, Filter, JobListItem };
@@ -109,13 +110,15 @@ function toItem(db: Db, row: JobRow): JobListItem {
   const match: ApplicationMatch | null = findApplicationMatch(db, { id: row.id, canonical_url: row.canonical_url, company_key: row.company_key, title_key: row.title_key });
   const tier = directTier(row.direct_value);
   const blockedAt = row.blocked_at;
+  const estimatedAt = row.posted_at ? null : earliestAlertAt(db, row.id);
   return {
     id: row.id,
     title: row.title,
     company: row.company,
     location: row.location,
     arrangement: row.arrangement,
-    posted_at: row.posted_at,
+    posted_at: estimatedAt ?? row.posted_at,
+    posted_estimated: !row.posted_at && estimatedAt !== null,
     pay: payText(row),
     score: row.score,
     confidence: row.confidence as Confidence | null,

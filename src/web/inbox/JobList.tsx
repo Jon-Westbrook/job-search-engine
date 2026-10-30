@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 import type { JobListItem } from '../../shared/types.ts';
-import { arrangementWord, postedLabel, scoreAnnouncement } from '../format.ts';
+import { arrangementWord, postedText, scoreAnnouncement } from '../format.ts';
 
 // Desktop: a real table with scope headers. Phone: cards with the same fields in the same order.
 export function flagTags(job: JobListItem): Array<{ text: string; tone: string }> {
@@ -80,7 +80,7 @@ export function JobList(props: ListProps) {
               </div>
               <div>
                 <dt>Posted</dt>
-                <dd>{postedLabel(job.posted_at)}</dd>
+                <dd>{postedText(job)}</dd>
               </div>
               <div>
                 <dt>Pay</dt>
@@ -140,7 +140,7 @@ export function JobList(props: ListProps) {
                   {job.location ?? 'Not stated'}
                   <p className="sub">{arrangementWord(job.arrangement)}</p>
                 </td>
-                <td data-label="Posted">{postedLabel(job.posted_at)}</td>
+                <td data-label="Posted">{postedText(job)}</td>
                 <td data-label="Pay">{job.pay?.text ?? 'Not listed'}</td>
                 <td data-label="Direct line">
                   <span className={`tg${directTag(job).dir ? ' dir' : ''}`}>{directTag(job).text}</span>

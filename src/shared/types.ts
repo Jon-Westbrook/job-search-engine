@@ -22,6 +22,7 @@ export interface JobListItem {
   location: string | null;
   arrangement: string | null;
   posted_at: string | null;
+  posted_estimated: boolean;
   pay: PayInfo | null;
   score: number | null;
   confidence: Confidence | null;

@@ -7,6 +7,7 @@ import { normalizeCompany } from '../normalize/keys.ts';
 import { buildBatchPrompt, BATCH_SIZE, validateBatch, type BatchItemResult } from './extract.ts';
 import { PROMPT_VERSION } from './extract.ts';
 import type { CodexRunner } from './codex.ts';
+import { earliestAlertAt } from '../jobs/posted.ts';
 import { activeWeightProfile } from './profile.ts';
 import { scoreListing, type Extraction, type ScoreOutput } from './rules.ts';
 
@@ -138,7 +139,9 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
   if (ai && 'extraction' in ai) extraction = ai.extraction;
   if (ai && 'invalid' in ai) extractionFlag = ai.invalid;
 
-  const postedAt = job.posted_at;
+  // No stated posting time: the earliest alert date stands in, and the score says so.
+  const estimatedAt = job.posted_at ? null : earliestAlertAt(db, jobId);
+  const postedAt = job.posted_at ?? estimatedAt;
   const output: ScoreOutput = scoreListing({
     now: deps.now(),
     weights: profile.weights,
@@ -147,6 +150,7 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
     location: job.location,
     arrangement: job.arrangement,
     postedAt,
+    postedEstimated: estimatedAt !== null,
     pay: job.comp_min !== null && job.comp_max !== null && job.comp_currency
       ? { min: job.comp_min, max: job.comp_max, currency: job.comp_currency, annualized: job.comp_annualized === 1 }
       : null,
