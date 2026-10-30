@@ -8,6 +8,7 @@ export function flagTags(job: JobListItem): Array<{ text: string; tone: string }
   if (job.rule_blocked) tags.push({ text: 'Blocked by rule', tone: 'red' });
   else if (job.blocked) tags.push({ text: 'Blocked', tone: 'red' });
   if (job.applied) tags.push({ text: `Applied ${job.applied.date ?? ''}`.trim(), tone: 'yel' });
+  else if (job.in_analysis) tags.push({ text: 'In Analysis', tone: 'dir' });
   if (job.possible_duplicate) tags.push({ text: 'Possible duplicate', tone: 'yel' });
   if (job.source_count > 1) tags.push({ text: `${job.source_count} sources`, tone: '' });
   if (job.tn_label === 'design_centric') tags.push({ text: 'TN inferred', tone: '' });
@@ -99,7 +100,7 @@ export function JobList(props: ListProps) {
             </div>
             <VerdictRow job={job} onVerdict={props.onVerdict} />
             <button type="button" className="act" onClick={() => props.onQuickProgress(job.id)} disabled={Boolean(job.blocked || job.rule_blocked)}>
-              {job.applied ? 'Progress (reason needed)' : 'Progress this job'}
+              {job.applied || job.in_analysis ? 'Progress (reason needed)' : 'Progress this job'}
             </button>
           </article>
         ))}

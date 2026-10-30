@@ -84,7 +84,7 @@ export function Detail(props: DetailProps) {
       await api.post(`jobs/${jobId}/progress`, { reason });
       setNeedReason(null);
       setReasonValue('');
-      setProgressLabel('Saved to Analysis');
+      setProgressLabel('Saved to Tracker as In Analysis');
       window.setTimeout(() => setProgressLabel('Progress this job'), 1500);
       onChanged();
       await load();
@@ -203,6 +203,11 @@ export function Detail(props: DetailProps) {
         <div className="notice notice-clay" role="status">
           <strong>Already applied</strong>
           {job.applied.date ? ` ${job.applied.date}` : ''}. Matched on {job.applied.reason}. Progress needs a reason.
+        </div>
+      )}
+      {job.in_analysis && (
+        <div className="notice" role="status">
+          <strong>In Analysis.</strong> Saved in the Tracker, not applied yet. Matched on {job.in_analysis.reason}.
         </div>
       )}
       {job.possible_duplicate && (

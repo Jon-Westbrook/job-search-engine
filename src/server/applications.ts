@@ -130,12 +130,13 @@ export function updateApplicationStatus(db: Db, applicationId: number, status: A
   const current = db.prepare('SELECT status FROM applications WHERE id = ?').get(applicationId) as { status: string } | undefined;
   if (!current) throw new Error('Application not found');
   if (current.status === status) return;
-  db.prepare('UPDATE applications SET status = ?, stage = ?, updated_at = ? WHERE id = ?').run(
-    status,
-    status === 'saved' ? 'analysis' : 'submit',
-    nowIso,
-    applicationId,
-  );
+  // The first move past Saved records the date. A later change keeps the original date.
+  db.prepare(
+    `UPDATE applications
+     SET status = ?, stage = ?, updated_at = ?,
+         applied_at = CASE WHEN ? = 'saved' THEN applied_at ELSE COALESCE(applied_at, ?) END
+     WHERE id = ?`,
+  ).run(status, status === 'saved' ? 'analysis' : 'submit', nowIso, status, nowIso, applicationId);
   db.prepare(
     `INSERT INTO application_events (application_id, type, from_value, to_value, note, created_at) VALUES (?, 'status', ?, ?, ?, ?)`,
   ).run(applicationId, current.status, status, note, nowIso);

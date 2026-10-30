@@ -50,6 +50,9 @@ export class RefreshService {
   constructor(deps: RefreshDeps, sources: SourceConfig[]) {
     this.deps = deps;
     this.sources = sources;
+    // A restart keeps the last completed refresh time, so the status still shows it.
+    const saved = deps.db.prepare("SELECT value FROM app_meta WHERE key = 'last_refresh_completed_at'").get() as { value: string } | undefined;
+    this.completedAt = saved?.value ?? null;
   }
 
   status(): { running: boolean; started_at: string | null; completed_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null; progress: RefreshProgress | null } {

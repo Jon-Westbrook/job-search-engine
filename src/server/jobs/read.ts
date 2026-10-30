@@ -101,6 +101,8 @@ export function payText(row: JobRow): JobListItem['pay'] {
   };
 }
 
+const APPLIED_STATUSES = new Set(['applied', 'interviewing', 'rejected', 'offer']);
+
 function toItem(db: Db, row: JobRow): JobListItem {
   const flags = parseList(row.flags);
   const missing = parseList(row.missing);
@@ -128,7 +130,9 @@ function toItem(db: Db, row: JobRow): JobListItem {
     blocked: blockedAt ? { at: blockedAt, reason: row.blocked_reason ?? '' } : null,
     closed: row.closed_at ? { at: row.closed_at, reason: row.closed_reason ?? '' } : null,
     rule_blocked: row.rule_blocked === 1,
-    applied: match ? { date: match.applied_at, reason: match.reason, status: match.status } : null,
+    // Only a status past Saved counts as applied. A progressed job is Saved and shows In Analysis.
+    applied: match && APPLIED_STATUSES.has(match.status) ? { date: match.applied_at, reason: match.reason, status: match.status } : null,
+    in_analysis: match && match.status === 'saved' ? { reason: match.reason } : null,
     possible_duplicate: weakMatchesFor(db, row.id).length > 0,
     source_count: row.source_count,
     first_seen: row.first_seen,

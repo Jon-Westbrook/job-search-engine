@@ -15,8 +15,8 @@ const TABS: Array<{ key: Tab; label: string }> = [
 ];
 
 const PLACEHOLDER: Record<'analysis' | 'submit', string> = {
-  analysis: 'Analysis ships in Phase 2.',
-  submit: 'Submit ships in Phase 3.',
+  analysis: 'Progressed jobs wait here as Saved in the Tracker. Tailoring and cover letters are not built yet.',
+  submit: 'Applying happens on the employer site. Then set the status to Applied in the Tracker.',
 };
 
 export function App() {
