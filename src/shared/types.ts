@@ -36,6 +36,7 @@ export interface JobListItem {
   blocked: { at: string; reason: string } | null;
   rule_blocked: boolean;
   applied: { date: string | null; reason: string; status: string } | null;
+  in_analysis: { reason: string } | null;
   closed: { at: string; reason: string } | null;
   possible_duplicate: boolean;
   source_count: number;

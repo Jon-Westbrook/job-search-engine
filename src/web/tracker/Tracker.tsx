@@ -158,6 +158,7 @@ export function Tracker(props: { onNotice: (m: string) => void }) {
                     </p>
                     <div className="tags">
                       <span className="tg">{r.origin === 'import' ? 'Imported' : r.origin === 'progress' ? 'From Inbox' : 'Added by hand'}</span>
+                      {r.status === 'saved' && <span className="tg">In Analysis, not applied</span>}
                       {r.import_status === 'uncertain' && <span className="tg yel">Uncertain, needs review</span>}
                       {r.source_channel && <span className="tg">{r.source_channel}</span>}
                     </div>
