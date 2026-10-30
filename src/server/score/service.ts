@@ -235,7 +235,7 @@ export function jobsNeedingScore(db: Db, limit = Number.MAX_SAFE_INTEGER): numbe
                AND e.created_at > (SELECT MAX(r.created_at) FROM score_runs r WHERE r.job_id = j.id)
            )
          )
-       ORDER BY j.last_seen DESC, j.id DESC
+       ORDER BY (SELECT COUNT(*) FROM targets t WHERE t.company_key = j.company_key) DESC, j.last_seen DESC, j.id DESC
        LIMIT ?`,
     )
     .all(limit) as Array<{ id: number }>;

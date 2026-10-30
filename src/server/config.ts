@@ -18,6 +18,7 @@ export interface Config {
   scoreMaxPerRefresh: number;
   targetsPath: string;
   contactsPath: string;
+  feedsPath: string;
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
@@ -64,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     scoreMaxPerRefresh: parseLimit(env.SCORE_MAX_PER_REFRESH),
     targetsPath: resolve(cwd, env.TARGETS_PATH || 'config/targets.local.json'),
     contactsPath: resolve(cwd, env.CONTACTS_PATH || 'config/contacts.local.json'),
+    feedsPath: resolve(cwd, env.FEEDS_PATH || 'config/feeds.json'),
   };
 }
 

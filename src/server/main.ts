@@ -13,6 +13,7 @@ import { loadAliases } from './normalize/aliases.ts';
 import { createCodexRunner } from './score/codex.ts';
 import { seedWeightProfile } from './score/profile.ts';
 import { loadTargetFile, syncContactsFromFile, syncTargets } from './lists.ts';
+import { loadFeeds } from './ingest/feeds.ts';
 import { scoreJob } from './score/service.ts';
 
 const config = loadConfig();
@@ -51,7 +52,7 @@ const codex = createCodexRunner({
 });
 const profileForScoring = profile;
 const scoring = { db, codex, logger, now: () => new Date(), aliases, profile: profileForScoring };
-const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly, scoreLimit: config.scoreMaxPerRefresh, syncLists }, sources);
+const refresh = new RefreshService({ db, runner, logger, aliases, scoring, rulesOnly: config.codex.rulesOnly, scoreLimit: config.scoreMaxPerRefresh, syncLists, feeds: loadFeeds(config.feedsPath), acceptedGeography: profile.targets?.accepted_geography ?? [] }, sources);
 
 const rescore = async (jobId: number): Promise<void> => {
   const aiAvailable = !config.codex.rulesOnly && (await codex.status()).available;

@@ -6,7 +6,7 @@ export const LINKEDIN_PARSER_VERSION = 'linkedin-alert-v1';
 export type Arrangement = 'onsite' | 'hybrid' | 'remote';
 
 export interface ParsedPosting {
-  provider: 'linkedin';
+  provider: 'linkedin' | 'greenhouse';
   sourceId: string; // LinkedIn job ID
   messageId: string;
   threadId: string;

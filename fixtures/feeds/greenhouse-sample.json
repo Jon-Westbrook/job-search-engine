@@ -1,0 +1,28 @@
+{
+  "jobs": [
+    {
+      "id": 1001,
+      "title": "Design Engineer, Brand Platforms",
+      "absolute_url": "https://boards.greenhouse.io/example/jobs/1001",
+      "location": { "name": "New York, New York, United States" },
+      "first_published": "2026-10-20T14:00:00-04:00",
+      "content": "&lt;p&gt;Build interactive brand experiences with React, TypeScript, and design systems. Work with strategy and creative teams in New York.&lt;/p&gt;"
+    },
+    {
+      "id": 1002,
+      "title": "Frontend Engineer",
+      "absolute_url": "https://boards.greenhouse.io/example/jobs/1002",
+      "location": { "name": "London, United Kingdom" },
+      "first_published": "2026-10-21T09:00:00-04:00",
+      "content": "&lt;p&gt;Frontend work for clients in London. This description is long enough to be stored if it were in scope.&lt;/p&gt;"
+    },
+    {
+      "id": 1003,
+      "title": "Remote Product Designer",
+      "absolute_url": "https://boards.greenhouse.io/example/jobs/1003",
+      "location": { "name": "Remote - Brooklyn, NY" },
+      "first_published": null,
+      "content": "&lt;p&gt;Remote role for a designer who works across product and brand, based in the New York area.&lt;/p&gt;"
+    }
+  ]
+}

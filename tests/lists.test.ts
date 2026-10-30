@@ -9,6 +9,7 @@ import { upsertPosting } from '../src/server/ingest/store.ts';
 import { groupNewPostings } from '../src/server/grouping.ts';
 import { directTierFor } from '../src/server/contacts.ts';
 import { listJobs } from '../src/server/jobs/read.ts';
+import { jobsNeedingScore } from '../src/server/score/service.ts';
 import { ListError, loadTargetFile, syncContactsFromFile, syncTargets } from '../src/server/lists.ts';
 import { fixtureMessages } from './support/fixtures.ts';
 
@@ -102,5 +103,15 @@ test('a contact with an unknown relationship is refused', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+  db.close();
+});
+
+test('the scoring queue puts a target-company job first', () => {
+  const { db, companies } = withJobs();
+  const pick = companies[0]!;
+  syncTargets(db, [{ name: pick }], {}, NOW);
+  const first = jobsNeedingScore(db, 1)[0]!;
+  const row = db.prepare('SELECT company FROM jobs WHERE id = ?').get(first) as { company: string };
+  assert.equal(row.company, pick);
   db.close();
 });

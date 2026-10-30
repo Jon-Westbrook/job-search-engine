@@ -4,6 +4,7 @@ import type { GogRunner } from './gog/wrapper.ts';
 import { runIngestion, type RefreshPhase, type SyncResult, type SyncSource } from './ingest/sync.ts';
 import type { SourceConfig } from './sources.ts';
 import { groupNewPostings } from './grouping.ts';
+import { attachFeedDescriptions, runFeeds, type FeedConfig, type FeedRunSummary } from './ingest/feeds.ts';
 import { scoreNeeded, type ScoringDeps } from './score/service.ts';
 
 export interface RefreshDeps {
@@ -17,6 +18,8 @@ export interface RefreshDeps {
   scoreLimit?: number;
   // Re-reads the personal lists (targets and contacts) before each refresh.
   syncLists?: () => void;
+  feeds?: FeedConfig[];
+  acceptedGeography?: string[];
 }
 
 export interface RefreshProgress {
@@ -44,6 +47,7 @@ export class RefreshService {
   private lastScoring: ScoringSummary | null = null;
   private progress: RefreshProgress | null = null;
   private completedAt: string | null = null;
+  private lastFeeds: FeedRunSummary | null = null;
   private cancelRequested = false;
 
   private readonly deps: RefreshDeps;
@@ -57,8 +61,8 @@ export class RefreshService {
     this.completedAt = saved?.value ?? null;
   }
 
-  status(): { running: boolean; started_at: string | null; completed_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null; progress: RefreshProgress | null } {
-    return { running: this.running, started_at: this.startedAt, completed_at: this.completedAt, last: this.lastResult, last_error: this.lastError, scoring: this.lastScoring, progress: this.progress };
+  status(): { running: boolean; started_at: string | null; completed_at: string | null; last: SyncResult | null; last_error: string | null; scoring: ScoringSummary | null; progress: RefreshProgress | null; feeds: FeedRunSummary | null } {
+    return { running: this.running, started_at: this.startedAt, completed_at: this.completedAt, last: this.lastResult, last_error: this.lastError, scoring: this.lastScoring, progress: this.progress, feeds: this.lastFeeds };
   }
 
   // Asks the running refresh to stop after the current thread. Completed work is kept.
@@ -126,8 +130,13 @@ export class RefreshService {
         results.push(result);
         this.lastResult = result;
       }
+      // Public company feeds run after the Gmail source. Their postings join the same grouping.
+      this.progress = { phase: 'downloading', done: 0, total: this.deps.feeds?.length ?? 0, messages: 0 };
+      const feedRun = await runFeeds(this.deps.db, this.deps.feeds ?? [], this.deps.acceptedGeography ?? [], this.deps.logger, new Date().toISOString());
+      this.lastFeeds = feedRun.summary;
       this.progress = { phase: 'processing', done: 0, total: 0, messages: 0 };
       groupNewPostings(this.deps.db, this.deps.aliases, new Date().toISOString());
+      attachFeedDescriptions(this.deps.db, feedRun.attachments, new Date().toISOString());
       await this.scoreAfterIngest();
     } catch (err) {
       this.lastError = err instanceof Error ? err.message : 'refresh failed';
