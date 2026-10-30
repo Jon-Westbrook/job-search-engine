@@ -7,7 +7,9 @@ test('defaults bind to loopback on port 3460', () => {
   assert.equal(c.host, '127.0.0.1');
   assert.equal(c.port, 3460);
   assert.equal(c.basePath, '');
-  assert.equal(c.codex.model, 'gpt-5.6-luna');
+  assert.equal(c.codex.model, 'gpt-6-luna');
+  assert.equal(c.codex.reasoningEffort, 'medium');
+  assert.equal(c.scoreMaxPerRefresh, 50);
   assert.equal(c.codex.rulesOnly, false);
 });
 

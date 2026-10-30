@@ -29,18 +29,21 @@ function ingest(db: Db, name: string) {
   groupNewPostings(db, {}, NOW.toISOString());
 }
 
+// Fake Codex. For each listing in the batch prompt it returns the same extraction, tagged with that job's id.
 function fakeCodex(result: { ok: true; json: unknown } | { ok: false; error: string }): CodexRunner & { calls: number } {
   const runner = {
     calls: 0,
-    model: 'gpt-5.6-luna',
-    reasoningEffort: 'low',
+    model: 'gpt-6-luna',
+    reasoningEffort: 'medium',
     async status() {
       return { available: true, detail: 'signed in' };
     },
-    async extract() {
+    async extractBatch(prompt: string) {
       runner.calls++;
       if (!result.ok) return { ok: false as const, error: result.error };
-      return { ok: true as const, json: result.json, model: 'gpt-5.6-luna', reasoningEffort: 'low', tokensIn: null, tokensOut: null };
+      const ids = [...prompt.matchAll(/<untrusted_listing job_id="(\d+)">/g)].map((m) => Number(m[1]));
+      const extractions = ids.map((id) => ({ job_id: id, ...(result.json as object) }));
+      return { ok: true as const, json: { extractions }, model: 'gpt-6-luna', reasoningEffort: 'medium', tokensIn: null, tokensOut: null };
     },
   };
   return runner;
@@ -84,7 +87,7 @@ test('scoring writes one run per job with the weight version, factor rows, and a
   for (const run of runs) {
     assert.equal(run.weight_profile_id, 1);
     assert.equal(run.mode, 'ai');
-    assert.equal(run.prompt_version, 'extract-v1');
+    assert.equal(run.prompt_version, 'extract-batch-v2');
     const sum = (db.prepare('SELECT SUM(points) AS s FROM score_factors WHERE score_run_id = ? AND factor != ?').get(run.id, 'Hard negative') as { s: number }).s;
     assert.equal(run.score, Math.round(sum), 'score equals the sum of its factors');
   }

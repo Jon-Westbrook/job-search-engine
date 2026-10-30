@@ -51,8 +51,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, cwd = process.c
     },
     codex: {
       bin: env.CODEX_BIN || 'codex',
-      model: env.CODEX_MODEL || 'gpt-5.6-luna',
-      reasoningEffort: env.CODEX_REASONING_EFFORT || 'low',
+      model: env.CODEX_MODEL || 'gpt-6-luna',
+      reasoningEffort: env.CODEX_REASONING_EFFORT || 'medium',
       timeoutMs: Number(env.CODEX_TIMEOUT_MS || 180_000),
       rulesOnly: env.SCORE_RULES_ONLY === '1',
     },
@@ -72,8 +72,8 @@ export function normalizeBasePath(raw: string): string {
 // AI scoring is capped per refresh so a daily refresh cannot make hundreds of calls.
 // Newest jobs are scored first. The rest wait for later refreshes.
 function parseLimit(raw: string | undefined): number {
-  const n = Number(raw ?? 100);
-  return Number.isInteger(n) && n >= 1 ? n : 100;
+  const n = Number(raw ?? 50);
+  return Number.isInteger(n) && n >= 1 ? n : 50;
 }
 
 function parseLogLevel(raw: string | undefined): Config['logLevel'] {
