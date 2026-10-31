@@ -178,8 +178,8 @@ test('a block does not change the score, and the weight editor creates a new ver
   const job = db.prepare('SELECT id FROM jobs LIMIT 1').get() as { id: number };
   blockJob(db, job.id, 'not for me', NOW.toISOString());
   assert.equal(jobsNeedingScore(db).includes(job.id), true, 'a never-scored job still needs a score');
-  assert.throws(() => validateWeights({ tn: 30, role: 30, direct: 15, recency: 10, compensation: 10, effort: 4 }), WeightError);
-  const next = saveWeightVersion(db, validateWeights({ tn: 35, role: 25, direct: 15, recency: 10, compensation: 10, effort: 5 }), 'more weight on TN', 'owner', NOW.toISOString());
+  assert.throws(() => validateWeights({ tn: 20, role: 15, target_role: 25, direct: 15, recency: 10, compensation: 10, effort: 4 }), WeightError);
+  const next = saveWeightVersion(db, validateWeights({ tn: 25, role: 10, target_role: 25, direct: 15, recency: 10, compensation: 10, effort: 5 }), 'more weight on TN', 'owner', NOW.toISOString());
   assert.equal(next.version, 2);
   assert.equal((db.prepare('SELECT COUNT(*) AS n FROM weight_profiles WHERE active = 1').get() as { n: number }).n, 1);
   db.close();

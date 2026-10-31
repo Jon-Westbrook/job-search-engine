@@ -1,5 +1,5 @@
 import type { Weights } from './profile.ts';
-import { DEFAULT_WEIGHTS, RULES_V1 } from './profile.ts';
+import { POINT_SCALE, RULES_V1 } from './profile.ts';
 
 // The deterministic scorer. Given the same inputs and weights, it returns the same score.
 // Verdicts are not inputs. The AI supplies factor values with evidence, and this code
@@ -110,13 +110,32 @@ function normalizeSpace(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 
+// The owner's target roles, from the title alone. No AI, so it is explainable and fixed.
+// Strong: forward deployed and design engineer. Near: frontend and full-stack. Adjacent: close titles.
+export type TargetRoleTier = 'strong' | 'near' | 'adjacent';
+const TARGET_ROLE_PATTERNS: Array<[TargetRoleTier, RegExp]> = [
+  ['strong', /\bforward[\s-]+deploy/i],
+  ['strong', /\bdesign[\s-]+engineer/i],
+  ['near', /\bfront[\s-]?end\b/i],
+  ['near', /\bfull[\s-]?stack\b/i],
+  ['adjacent', /\bproduct engineer/i],
+  ['adjacent', /\bui\s*\/?\s*ux engineer/i],
+  ['adjacent', /\bcreative (technolog|engineer)/i],
+  ['adjacent', /\binteraction engineer/i],
+  ['adjacent', /\bweb developer\b/i],
+];
+
+export function targetRoleTier(title: string): TargetRoleTier | null {
+  for (const [tier, pattern] of TARGET_ROLE_PATTERNS) if (pattern.test(title)) return tier;
+  return null;
+}
+
 function scale(points: number, weight: number, defaultWeight: number): number {
   return Math.round((points * weight) / defaultWeight * 10) / 10;
 }
 
 export function scoreListing(input: ScoreInput): ScoreOutput {
   const w = input.weights;
-  const d = DEFAULT_WEIGHTS;
   const factors: FactorLine[] = [];
   const penalties: FactorLine[] = [];
   const missing: string[] = [];
@@ -154,7 +173,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     factors.push({
       factor: 'TN and visa fit',
       aiValue: label,
-      points: scale(raw, w.tn, d.tn),
+      points: scale(raw, w.tn, POINT_SCALE.tn),
       max: w.tn,
       evidence,
       sourceField: evidence[0]?.field ?? null,
@@ -189,7 +208,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     factors.push({
       factor: 'Role and resume fit',
       aiValue: `seniority ${values[0]}, balance ${values[1]}, stack ${values[2]}`,
-      points: Math.round(RULES_V1.role.points_at_full * avg * (w.role / d.role) * 10) / 10,
+      points: Math.round(RULES_V1.role.points_at_full * avg * (w.role / POINT_SCALE.role) * 10) / 10,
       max: w.role,
       evidence: quoted,
       sourceField: quoted[0]?.field ?? null,
@@ -203,11 +222,23 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
   factors.push({
     factor: 'Direct line',
     aiValue: input.directTier === 0 ? 'none' : `tier ${input.directTier}`,
-    points: scale(tierPoints, w.direct, d.direct),
+    points: scale(tierPoints, w.direct, POINT_SCALE.direct),
     max: w.direct,
     evidence: [],
     sourceField: 'contacts',
     confidence: input.directTier === 0 ? null : 'high',
+  });
+
+  // Target role (max = weight.target_role). From the title only, so it does not depend on the AI.
+  const tier = targetRoleTier(input.title);
+  factors.push({
+    factor: 'Target role',
+    aiValue: tier ? `${tier} match` : 'no match',
+    points: tier ? scale(RULES_V1.target_role[tier], w.target_role, POINT_SCALE.target_role) : 0,
+    max: w.target_role,
+    evidence: tier ? [{ quote: input.title, field: 'title' }] : [],
+    sourceField: 'title',
+    confidence: 'high',
   });
 
   // Recency (max = weight.recency). Computed, not AI. Unknown time gives 5 and Low confidence.
@@ -220,7 +251,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     factors.push({
       factor: 'Recency',
       aiValue: `${Math.round(ageDays * 10) / 10} days old${input.postedEstimated ? ' (estimated from alert date)' : ''}`,
-      points: scale(Math.round(pts), w.recency, d.recency),
+      points: scale(Math.round(pts), w.recency, POINT_SCALE.recency),
       max: w.recency,
       evidence: [],
       sourceField: 'posted_at',
@@ -229,7 +260,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     if (input.postedEstimated) flags.push('Posting time estimated from the alert date');
   } else {
     missing.push('posting time');
-    factors.push({ factor: 'Recency', aiValue: 'unknown', points: scale(5, w.recency, d.recency), max: w.recency, evidence: [], sourceField: null, confidence: 'low' });
+    factors.push({ factor: 'Recency', aiValue: 'unknown', points: scale(5, w.recency, POINT_SCALE.recency), max: w.recency, evidence: [], sourceField: null, confidence: 'low' });
   }
 
   // Compensation (max = weight.compensation). Annual base only. Hourly rates are not
@@ -248,7 +279,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     factors.push({
       factor: 'Compensation',
       aiValue: `posted maximum ${top.toLocaleString('en-US')}`,
-      points: scale(raw, w.compensation, d.compensation),
+      points: scale(raw, w.compensation, POINT_SCALE.compensation),
       max: w.compensation,
       evidence: [],
       sourceField: 'pay',
@@ -259,7 +290,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     factors.push({
       factor: 'Compensation',
       aiValue: input.pay ? 'not annualized' : 'not listed',
-      points: scale(c.not_listed, w.compensation, d.compensation),
+      points: scale(c.not_listed, w.compensation, POINT_SCALE.compensation),
       max: w.compensation,
       evidence: [],
       sourceField: null,
@@ -272,7 +303,7 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
   factors.push({
     factor: 'Effort',
     aiValue: input.easyApply ? 'Easy Apply' : 'unknown route',
-    points: scale(input.easyApply ? RULES_V1.effort.easy_apply : RULES_V1.effort.unknown, w.effort, d.effort),
+    points: scale(input.easyApply ? RULES_V1.effort.easy_apply : RULES_V1.effort.unknown, w.effort, POINT_SCALE.effort),
     max: w.effort,
     evidence: [],
     sourceField: 'alert',

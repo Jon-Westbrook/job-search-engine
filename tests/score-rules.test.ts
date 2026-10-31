@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_WEIGHTS } from '../src/server/score/profile.ts';
-import { findHardNegatives, scoreListing, type Extraction, type ScoreInput } from '../src/server/score/rules.ts';
+import { findHardNegatives, scoreListing, targetRoleTier, type Extraction, type ScoreInput } from '../src/server/score/rules.ts';
 
 const NOW = new Date('2026-10-28T20:00:00.000Z');
 
@@ -42,15 +42,16 @@ const WORKED: Extraction = {
   missing: [],
 };
 
-test('worked example (brief 8.7): 27 + 25 + 15 + 10 + 10 + 5 = 92, Medium confidence', () => {
+test('worked example, weight version 3: 18 + 12.5 + 25 + 15 + 10 + 10 + 5 = 95.5, shown as 96, Medium confidence', () => {
   const out = scoreListing(base({ extraction: WORKED }));
   assert.equal(out.mode, 'ai');
-  assert.equal(out.score, 92);
+  assert.equal(out.score, 96);
   assert.equal(out.confidence, 'medium');
   const byName = Object.fromEntries(out.factors.map((f) => [f.factor, f.points]));
   assert.deepEqual(byName, {
-    'TN and visa fit': 27,
-    'Role and resume fit': 25,
+    'TN and visa fit': 18,
+    'Role and resume fit': 12.5,
+    'Target role': 25,
     'Direct line': 15,
     Recency: 10,
     Compensation: 10,
@@ -72,7 +73,7 @@ test('without AI extraction the score is rules only, labelled low confidence, an
   assert.equal(out.confidence, 'low');
   assert.equal(out.factors.some((f) => f.factor === 'TN and visa fit'), false);
   assert.ok(out.missing.some((m) => m.startsWith('TN fit')));
-  assert.equal(out.score, 40, 'recency 10 + compensation 10 + effort 5 + direct line 15');
+  assert.equal(out.score, 65, 'recency 10 + compensation 10 + effort 5 + direct line 15 + target role 25');
 });
 
 test('a hard negative caps the score at 5, sets the rule block, and quotes the evidence', () => {
@@ -94,7 +95,7 @@ test('a quote that is not in the listing does not support the factor', () => {
   };
   const out = scoreListing(base({ extraction: fabricated, description: 'A design engineer role.' }));
   const tn = out.factors.find((f) => f.factor === 'TN and visa fit');
-  assert.equal(tn?.points, 8, 'falls back to the lowest class');
+  assert.equal(tn?.points, 5.3, 'falls back to the lowest class (8 at weight 30, scaled to 20)');
   assert.ok(out.flags.some((f) => /TN fit unsupported/.test(f)));
   assert.equal(tn?.evidence.length, 0);
 });
@@ -106,8 +107,8 @@ test('a role sub-value without evidence counts as 0.5 and lowers confidence', ()
   };
   const out = scoreListing(base({ extraction: partial }));
   const role = out.factors.find((f) => f.factor === 'Role and resume fit');
-  // avg(0.8, 0.8, 0.5) = 0.7 → 21
-  assert.equal(role?.points, 21);
+  // avg(0.8, 0.8, 0.5) = 0.7 → 30 × 0.7 × (15 / 30) = 10.5
+  assert.equal(role?.points, 10.5);
   assert.ok(out.flags.some((f) => /stack overlap has no quoted evidence/.test(f)));
 });
 
@@ -152,7 +153,7 @@ test('an Easy Apply route scores 5, and an unknown route scores 3', () => {
 test('a junior role takes a 10 point penalty shown apart from factor points', () => {
   const out = scoreListing(base({ extraction: WORKED, title: 'Junior Design Engineer' }));
   assert.equal(out.penalties.find((p) => p.factor === 'Junior or internship role')?.points, -10);
-  assert.equal(out.score, 82);
+  assert.equal(out.score, 86, '96 less the 10 point junior penalty');
 });
 
 test('a known TN-hostile agency takes a 10 point penalty', () => {
@@ -195,4 +196,25 @@ test('a missing company or a posting older than 60 days is flagged for review', 
   assert.ok(old.flags.some((f) => /may be expired/.test(f)));
   const noCompany = scoreListing(base({ extraction: WORKED, company: null }));
   assert.ok(noCompany.flags.some((f) => /company missing/.test(f)));
+});
+
+test('target role tiers follow the owner priorities: forward deployed and design engineer, then frontend and full-stack, then close titles', () => {
+  assert.equal(targetRoleTier('Forward Deployed Engineer (FDE)'), 'strong');
+  assert.equal(targetRoleTier('Forward-Deployed AI Engineer'), 'strong');
+  assert.equal(targetRoleTier('Design Engineer'), 'strong');
+  assert.equal(targetRoleTier('Senior Design Engineer, Brand'), 'strong');
+  assert.equal(targetRoleTier('Senior Frontend Developer'), 'near');
+  assert.equal(targetRoleTier('Front-End Engineer'), 'near');
+  assert.equal(targetRoleTier('Full-Stack Engineer'), 'near');
+  assert.equal(targetRoleTier('Product Engineer'), 'adjacent');
+  assert.equal(targetRoleTier('Director of Technology'), null);
+  assert.equal(targetRoleTier('Engineering Manager, Platform'), null);
+});
+
+test('a forward deployed role scores the full target-role points, and a director role scores none', () => {
+  const fde = scoreListing(base({ title: 'Forward Deployed Engineer', extraction: WORKED }));
+  const director = scoreListing(base({ title: 'Director of Technology', extraction: WORKED }));
+  assert.equal(fde.factors.find((f) => f.factor === 'Target role')?.points, 25);
+  assert.equal(director.factors.find((f) => f.factor === 'Target role')?.points, 0);
+  assert.ok(fde.score > director.score, 'the target role lifts the score');
 });
