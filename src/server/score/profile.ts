@@ -1,24 +1,31 @@
 import type { Db } from '../db/index.ts';
 
-// Weight profile v1 (brief section 8.1 and 8.2). Each weight is the factor's maximum.
+// Weight profile (brief section 8.1 and 8.2). Each weight is the factor's maximum.
 // Changing a weight creates a new version. Old scores keep the version they used.
+// Version 3 added target_role, a title-based factor for the owner's target roles.
 export interface Weights {
   tn: number;
   role: number;
+  target_role: number;
   direct: number;
   recency: number;
   compensation: number;
   effort: number;
 }
 
-export const WEIGHT_KEYS: Array<keyof Weights> = ['tn', 'role', 'direct', 'recency', 'compensation', 'effort'];
-export const DEFAULT_WEIGHTS: Weights = { tn: 30, role: 30, direct: 15, recency: 10, compensation: 10, effort: 5 };
+export const WEIGHT_KEYS: Array<keyof Weights> = ['tn', 'role', 'target_role', 'direct', 'recency', 'compensation', 'effort'];
+// The scale the point values in RULES_V1 were written at. Scoring multiplies a point value by
+// weight / POINT_SCALE, so changing the default weights never changes what a point value means.
+export const POINT_SCALE: Weights = { tn: 30, role: 30, target_role: 25, direct: 15, recency: 10, compensation: 10, effort: 5 };
+export const DEFAULT_WEIGHTS: Weights = { tn: 20, role: 15, target_role: 25, direct: 15, recency: 10, compensation: 10, effort: 5 };
 
 // The point rules and thresholds used with the weights. Stored with each version so an
 // old score can be explained later.
 export const RULES_V1 = {
   tn: { explicit: 30, design_centric: 27, partial: 18, none: 8 },
   role: { points_at_full: 30, missing_subvalue: 0.5 },
+  // Points at the default weight for each title tier. Scaled by the weight like the others.
+  target_role: { strong: 25, near: 20, adjacent: 10 },
   recency: { full_days: 1, zero_days: 14 },
   compensation: { at_or_above_160k: 10, from_150k: 6, below_150k: 2, not_listed: 5, high_threshold: 160000, mid_threshold: 150000 },
   effort: { easy_apply: 5, unknown: 3 },
