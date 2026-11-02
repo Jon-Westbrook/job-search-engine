@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
-import type { NetworkRow } from '../../shared/types.ts';
+import type { NetworkContact, NetworkJob, NetworkRow } from '../../shared/types.ts';
 import { draftMessage } from '../../shared/drafts.ts';
 import { postedText } from '../format.ts';
 
-// People you know, by company, with the open jobs there ranked by score. A draft is copied to
-// the clipboard. The app never sends a message; you send it yourself on LinkedIn.
+// Everyone you know, grouped by company, with the open jobs there ranked by score. A draft is
+// written for you to edit. Copy it, or copy and open the person on LinkedIn; you send it yourself.
 
 const RELATIONSHIP: Record<string, string> = {
   friend: 'Friend',
@@ -23,15 +23,15 @@ interface Props {
 
 interface OpenDraft {
   key: string;
-  contact: string;
+  contact: NetworkContact;
   company: string;
   jobId: number | null;
+  text: string;
 }
 
 export function Network({ onNotice }: Props) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [onlyWithJobs, setOnlyWithJobs] = useState(true);
   const [draft, setDraft] = useState<OpenDraft | null>(null);
 
   useEffect(() => {
@@ -41,12 +41,25 @@ export function Network({ onNotice }: Props) {
       .catch(() => setError('The network did not load. Check that the server is running.'));
   }, []);
 
-  const shown = useMemo(() => (rows ?? []).filter((r) => !onlyWithJobs || r.job_count > 0), [rows, onlyWithJobs]);
+  function openDraft(row: NetworkRow, contact: NetworkContact) {
+    const key = `${row.company}|${contact.name}`;
+    if (draft?.key === key) return setDraft(null);
+    const jobId = row.jobs[0]?.id ?? null;
+    const job = row.jobs[0] ?? null;
+    setDraft({ key, contact, company: row.company, jobId, text: draftMessage(contact.name, row.company, job?.title ?? null) });
+  }
 
-  async function copy(text: string) {
+  function pickJob(row: NetworkRow, jobId: number | null) {
+    if (!draft) return;
+    const job = row.jobs.find((j) => j.id === jobId) ?? null;
+    setDraft({ ...draft, jobId, text: draftMessage(draft.contact.name, row.company, job?.title ?? null) });
+  }
+
+  async function copy(text: string, then?: () => void) {
     try {
       await navigator.clipboard.writeText(text);
-      onNotice('Draft copied. Paste it into LinkedIn and send it yourself.');
+      onNotice(then ? 'Draft copied. On LinkedIn, click Message and paste.' : 'Draft copied. Paste it into LinkedIn and send it yourself.');
+      then?.();
     } catch {
       onNotice('Could not copy. Select the text and copy it by hand.');
     }
@@ -57,25 +70,26 @@ export function Network({ onNotice }: Props) {
 
   return (
     <section className="network" aria-label="Network">
-      <div className="network-head">
-        <h1 className="title">Network</h1>
-        <label className="network-toggle">
-          <input type="checkbox" checked={onlyWithJobs} onChange={(e) => setOnlyWithJobs(e.target.checked)} /> Only companies with open jobs
-        </label>
-      </div>
-      {shown.length === 0 && <p className="empty">{rows.length === 0 ? 'No contacts yet. Add them to config/contacts.local.json.' : 'No company with open jobs yet.'}</p>}
+      <h1 className="title">Network</h1>
+      {rows.length === 0 && <p className="empty">No contacts yet. Add them to config/contacts.local.json.</p>}
       <ul className="network-list">
-        {shown.map((row) => (
+        {rows.map((row) => (
           <li key={row.company} className="network-row">
             <div className="network-company">
               <p className="role">
                 {row.company} {row.target && <span className="tg dir">Target</span>}
               </p>
               <p className="sub">
-                {row.contacts.length} {row.contacts.length === 1 ? 'person' : 'people'} you know
-                {row.job_count > 0 ? ` / ${row.job_count} open ${row.job_count === 1 ? 'job' : 'jobs'}` : ' / no open jobs'}
+                {row.contacts.length} {row.contacts.length === 1 ? 'person' : 'people'} / {row.job_count > 0 ? `${row.job_count} open ${row.job_count === 1 ? 'job' : 'jobs'}` : 'no open jobs'}
               </p>
             </div>
+
+            <ul className="network-jobs">
+              {row.jobs.map((j) => (
+                <JobLine key={j.id} job={j} />
+              ))}
+              {row.job_count > row.jobs.length && <li className="sub">and {row.job_count - row.jobs.length} more in the Inbox</li>}
+            </ul>
 
             <div className="network-people">
               {row.contacts.map((c) => {
@@ -86,43 +100,23 @@ export function Network({ onNotice }: Props) {
                     <span>
                       {c.name} <span className="tg">{RELATIONSHIP[c.relationship] ?? c.relationship}</span>
                     </span>
-                    {row.job_count > 0 && (
-                      <button
-                        type="button"
-                        className="btn"
-                        aria-expanded={open}
-                        onClick={() => setDraft(open ? null : { key, contact: c.name, company: row.company, jobId: row.jobs[0]?.id ?? null })}
-                      >
-                        {open ? 'Close draft' : 'Draft message'}
-                      </button>
-                    )}
+                    <button type="button" className="btn" aria-expanded={open} onClick={() => openDraft(row, c)}>
+                      {open ? 'Close' : 'Draft message'}
+                    </button>
                     {open && draft && (
                       <DraftBox
                         draft={draft}
-                        jobs={row.jobs}
-                        onChange={setDraft}
-                        onCopy={copy}
+                        row={row}
+                        onPickJob={(id) => pickJob(row, id)}
+                        onEdit={(text) => setDraft({ ...draft, text })}
+                        onCopy={() => copy(draft.text)}
+                        onOpen={() => copy(draft.text, () => window.open(linkedInPlace(draft.contact, row.company), '_blank', 'noopener'))}
                       />
                     )}
                   </div>
                 );
               })}
             </div>
-
-            {row.jobs.length > 0 && (
-              <ul className="network-jobs">
-                {row.jobs.map((j) => (
-                  <li key={j.id}>
-                    <span className="network-job-title">{j.title}</span>
-                    <span className="sub">
-                      {j.location ?? 'Location not stated'} / {postedText({ posted_at: j.posted_at, posted_estimated: j.posted_estimated })}
-                    </span>
-                    <span className="tg">{j.score === null ? 'not scored' : `score ${j.score}`}</span>
-                  </li>
-                ))}
-                {row.job_count > row.jobs.length && <li className="sub">and {row.job_count - row.jobs.length} more in the Inbox</li>}
-              </ul>
-            )}
           </li>
         ))}
       </ul>
@@ -130,34 +124,67 @@ export function Network({ onNotice }: Props) {
   );
 }
 
+function JobLine({ job }: { job: NetworkJob }) {
+  return (
+    <li>
+      <a className="network-job-title" href={job.url} target="_blank" rel="noreferrer">
+        {job.title}
+      </a>
+      <span className="sub">
+        {job.location ?? 'Location not stated'} / {postedText({ posted_at: job.posted_at, posted_estimated: job.posted_estimated })}
+      </span>
+      <span className="tg">{job.score === null ? 'not scored' : `score ${job.score}`}</span>
+    </li>
+  );
+}
+
+// The person's profile when we have it. Otherwise a LinkedIn people search for name and company.
+export function linkedInPlace(contact: NetworkContact, company: string): string {
+  if (contact.profile_url) return contact.profile_url;
+  return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${contact.name} ${company}`)}`;
+}
+
 function DraftBox({
   draft,
-  jobs,
-  onChange,
+  row,
+  onPickJob,
+  onEdit,
   onCopy,
+  onOpen,
 }: {
   draft: OpenDraft;
-  jobs: NetworkRow['jobs'];
-  onChange: (d: OpenDraft) => void;
-  onCopy: (text: string) => void;
+  row: NetworkRow;
+  onPickJob: (id: number | null) => void;
+  onEdit: (text: string) => void;
+  onCopy: () => void;
+  onOpen: () => void;
 }) {
-  const job = jobs.find((j) => j.id === draft.jobId) ?? null;
-  const text = draftMessage(draft.contact, draft.company, job?.title ?? null);
+  const job = row.jobs.find((j) => j.id === draft.jobId) ?? null;
   return (
     <div className="network-draft">
       <label className="field-label" htmlFor={`draft-job-${draft.key}`}>Role to mention</label>
-      <select id={`draft-job-${draft.key}`} value={draft.jobId ?? ''} onChange={(e) => onChange({ ...draft, jobId: e.target.value ? Number(e.target.value) : null })}>
-        {jobs.map((j) => (
+      <select id={`draft-job-${draft.key}`} value={draft.jobId ?? ''} onChange={(e) => onPickJob(e.target.value ? Number(e.target.value) : null)}>
+        {row.jobs.map((j) => (
           <option key={j.id} value={j.id}>
             {j.title}
           </option>
         ))}
         <option value="">No specific role</option>
       </select>
-      <textarea readOnly rows={5} value={text} aria-label="Draft message" />
-      <button type="button" className="btn" onClick={() => onCopy(text)}>
-        Copy draft
-      </button>
+      {job && (
+        <a href={job.url} target="_blank" rel="noreferrer">
+          Open the listing to check it
+        </a>
+      )}
+      <textarea rows={5} value={draft.text} onChange={(e) => onEdit(e.target.value)} aria-label="Draft message" />
+      <div className="network-draft-actions">
+        <button type="button" className="btn" onClick={onCopy}>
+          Copy draft
+        </button>
+        <button type="button" className="btn btn-dark" onClick={onOpen}>
+          Copy and open LinkedIn
+        </button>
+      </div>
     </div>
   );
 }

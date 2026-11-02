@@ -21,13 +21,14 @@ const JOBS_SHOWN = 3;
 
 export function buildNetwork(db: Db): NetworkRow[] {
   const contacts = db
-    .prepare('SELECT name, company, company_key, relationship FROM contacts WHERE company_key IS NOT NULL ORDER BY name')
-    .all() as Array<{ name: string; company: string; company_key: string; relationship: string | null }>;
+    .prepare('SELECT name, company, company_key, relationship, profile_url FROM contacts WHERE company_key IS NOT NULL ORDER BY name')
+    .all() as Array<{ name: string; company: string; company_key: string; relationship: string | null; profile_url: string | null }>;
   if (contacts.length === 0) return [];
 
   const jobKeys = new Map(
     (db.prepare('SELECT id, company_key FROM jobs').all() as Array<{ id: number; company_key: string | null }>).map((r) => [r.id, r.company_key]),
   );
+  const jobUrls = new Map((db.prepare('SELECT id, canonical_url FROM jobs').all() as Array<{ id: number; canonical_url: string }>).map((r) => [r.id, r.canonical_url]));
   const targets = new Map((db.prepare('SELECT company_key, name FROM targets').all() as Array<{ company_key: string; name: string }>).map((r) => [r.company_key, r.name]));
   // Open jobs only: not blocked, not rule-blocked, not closed on LinkedIn.
   const openJobs = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).items;
@@ -35,7 +36,7 @@ export function buildNetwork(db: Db): NetworkRow[] {
   const byKey = new Map<string, { company: string; contacts: NetworkContact[] }>();
   for (const c of contacts) {
     const row = byKey.get(c.company_key) ?? { company: c.company, contacts: [] };
-    row.contacts.push({ name: c.name, relationship: c.relationship ?? 'connection' });
+    row.contacts.push({ name: c.name, relationship: c.relationship ?? 'connection', profile_url: c.profile_url });
     byKey.set(c.company_key, row);
   }
 
@@ -52,6 +53,7 @@ export function buildNetwork(db: Db): NetworkRow[] {
       jobs: jobs.slice(0, JOBS_SHOWN).map((j) => ({
         id: j.id,
         title: j.title,
+        url: jobUrls.get(j.id) ?? '',
         location: j.location,
         score: j.score,
         band: j.band,

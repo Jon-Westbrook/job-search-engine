@@ -30,7 +30,7 @@ export const RULES_V1 = {
   compensation: { at_or_above_160k: 10, from_150k: 6, below_150k: 2, not_listed: 5, high_threshold: 160000, mid_threshold: 150000 },
   effort: { easy_apply: 5, unknown: 3 },
   direct_tiers: { tier1: 15, tier2: 10, tier3: 5, none: 0 },
-  penalties: { junior_role: -10, onsite_outside_geography: -15, onsite_commutable: -5, tn_hostile_agency: -10 },
+  penalties: { junior_role: -10, onsite_outside_geography: -25, tn_hostile_agency: -10 },
   hard_negative_cap: 5,
   bands: { good_fit: 65, review: 50 },
 } as const;

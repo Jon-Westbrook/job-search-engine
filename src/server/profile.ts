@@ -7,7 +7,7 @@ export interface Profile {
   display_name?: string;
   resume_summary?: string;
   tn_hostile_agencies?: string[];
-  targets?: { accepted_geography?: string[]; commute_geography?: string[]; minimum_base_usd?: number | null; target_base_usd?: number | null };
+  targets?: { accepted_geography?: string[]; minimum_base_usd?: number | null; target_base_usd?: number | null };
 }
 
 export function loadProfile(path: string): Profile {

@@ -129,11 +129,13 @@ export const REASON_TAGS = ['Role fit', 'Seniority', 'Pay', 'Location', 'Visa', 
 export interface NetworkContact {
   name: string;
   relationship: string;
+  profile_url: string | null;
 }
 
 export interface NetworkJob {
   id: number;
   title: string;
+  url: string;
   location: string | null;
   score: number | null;
   band: Band;

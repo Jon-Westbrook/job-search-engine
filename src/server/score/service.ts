@@ -21,7 +21,7 @@ export interface ScoringDeps {
     gmail_account?: string;
     resume_summary?: string;
     tn_hostile_agencies?: string[];
-    targets?: { accepted_geography?: string[]; commute_geography?: string[] };
+    targets?: { accepted_geography?: string[] };
   };
 }
 
@@ -120,7 +120,6 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
   const description = (db.prepare('SELECT text FROM job_descriptions WHERE job_id = ? ORDER BY id DESC LIMIT 1').get(jobId) as { text: string } | undefined)?.text ?? null;
   const profile = activeWeightProfile(db);
   const acceptedGeography = deps.profile.targets?.accepted_geography ?? [];
-  const commuteGeography = deps.profile.targets?.commute_geography ?? [];
   const tnHostileAgencies = (deps.profile.tn_hostile_agencies ?? []).map((a) => normalizeCompany(a, deps.aliases) ?? a.toLowerCase());
   const resume = deps.profile.resume_summary ?? '';
   const directTier = directTierFor(db, job.company_key, hint);
@@ -162,7 +161,6 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
     extraSources: [],
     extraction,
     acceptedGeography,
-    commuteGeography,
     tnHostileAgencies,
     companyKey: job.company_key,
     alreadyApplied: Boolean(match),
