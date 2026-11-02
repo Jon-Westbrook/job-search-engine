@@ -67,7 +67,7 @@ test('no contacts gives an empty network', () => {
   db.close();
 });
 
-test('drafts name the contact and the role, and never sign for the owner', () => {
+test('drafts name the contact and the role, and end without a signature', () => {
   const withRole = draftMessage('Ann Friend', 'VML', 'Design Engineer');
   assert.match(withRole, /^Hi Ann, /);
   assert.match(withRole, /Design Engineer role at VML/);
