@@ -1440,3 +1440,107 @@ textarea {
     bottom: 128px;
   }
 }
+
+/* Network: people you know, by company, with the open jobs there */
+
+.network {
+  padding: 24px 28px;
+  min-width: 0;
+}
+
+.network-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.network-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13px/1.2 var(--font-mono);
+}
+
+.network-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.network-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(200px, 1fr) minmax(220px, 1.4fr);
+  gap: 16px;
+  padding: 16px;
+  background: var(--panel);
+  border: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.network-company .role {
+  margin: 0;
+  font-weight: 700;
+}
+
+.network-people {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.network-person {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.network-draft {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border: var(--border);
+  background: var(--ground);
+}
+
+.network-draft textarea {
+  width: 100%;
+  font: 400 14px/1.4 var(--font-sans);
+  background: var(--bar);
+  color: var(--cream);
+  border: var(--border);
+  padding: 8px;
+}
+
+.network-jobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.network-jobs li {
+  display: grid;
+  gap: 2px;
+}
+
+.network-job-title {
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .network {
+    padding: 16px;
+  }
+
+  .network-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

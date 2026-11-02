@@ -21,7 +21,7 @@ export interface ScoringDeps {
     gmail_account?: string;
     resume_summary?: string;
     tn_hostile_agencies?: string[];
-    targets?: { accepted_geography?: string[] };
+    targets?: { accepted_geography?: string[]; commute_geography?: string[] };
   };
 }
 
@@ -120,6 +120,7 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
   const description = (db.prepare('SELECT text FROM job_descriptions WHERE job_id = ? ORDER BY id DESC LIMIT 1').get(jobId) as { text: string } | undefined)?.text ?? null;
   const profile = activeWeightProfile(db);
   const acceptedGeography = deps.profile.targets?.accepted_geography ?? [];
+  const commuteGeography = deps.profile.targets?.commute_geography ?? [];
   const tnHostileAgencies = (deps.profile.tn_hostile_agencies ?? []).map((a) => normalizeCompany(a, deps.aliases) ?? a.toLowerCase());
   const resume = deps.profile.resume_summary ?? '';
   const directTier = directTierFor(db, job.company_key, hint);
@@ -161,6 +162,7 @@ export async function scoreJob(deps: ScoringDeps, jobId: number, aiAvailable: bo
     extraSources: [],
     extraction,
     acceptedGeography,
+    commuteGeography,
     tnHostileAgencies,
     companyKey: job.company_key,
     alreadyApplied: Boolean(match),
@@ -222,6 +224,14 @@ function applyRuleBlock(db: Db, job: JobRow, output: ScoreOutput, nowIso: string
 
 // Jobs that need a score: never scored, or changed since the last run (a pasted description
 // or a merge). Verdicts and blocks do not count as changes.
+// Target-role titles go first in the queue, so the capped AI budget goes to the roles the owner
+// wants. Patterns mirror TARGET_ROLE_PATTERNS in rules.ts; a LIKE pattern is a close match.
+const TARGET_ROLE_SQL = `(
+  lower(j.title) LIKE '%forward%deploy%' OR lower(j.title) LIKE '%design%engineer%'
+  OR lower(j.title) LIKE '%front%end%' OR lower(j.title) LIKE '%full%stack%'
+  OR lower(j.title) LIKE '%product engineer%' OR lower(j.title) LIKE '%web developer%'
+)`;
+
 export function jobsNeedingScore(db: Db, limit = Number.MAX_SAFE_INTEGER): number[] {
   const rows = db
     .prepare(
@@ -235,7 +245,10 @@ export function jobsNeedingScore(db: Db, limit = Number.MAX_SAFE_INTEGER): numbe
                AND e.created_at > (SELECT MAX(r.created_at) FROM score_runs r WHERE r.job_id = j.id)
            )
          )
-       ORDER BY (SELECT COUNT(*) FROM targets t WHERE t.company_key = j.company_key) DESC, j.last_seen DESC, j.id DESC
+       ORDER BY
+         CASE WHEN ${TARGET_ROLE_SQL} THEN 0 ELSE 1 END,
+         (SELECT COUNT(*) FROM targets t WHERE t.company_key = j.company_key) DESC,
+         j.last_seen DESC, j.id DESC
        LIMIT ?`,
     )
     .all(limit) as Array<{ id: number }>;

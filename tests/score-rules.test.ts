@@ -218,3 +218,13 @@ test('a forward deployed role scores the full target-role points, and a director
   assert.equal(director.factors.find((f) => f.factor === 'Target role')?.points, 0);
   assert.ok(fde.score > director.score, 'the target role lifts the score');
 });
+
+test('an on-site role in a commutable town takes 5 and a Travel flag; a farther town still takes 15', () => {
+  const accepted = ['new york'];
+  const near = scoreListing(base({ extraction: WORKED, location: 'Paramus, NJ', arrangement: 'onsite', acceptedGeography: accepted, commuteGeography: ['paramus'] }));
+  const far = scoreListing(base({ extraction: WORKED, location: 'Austin, TX', arrangement: 'onsite', acceptedGeography: accepted, commuteGeography: ['paramus'] }));
+  assert.equal(near.penalties.find((p) => p.factor.startsWith('On-site'))?.points, -5);
+  assert.ok(near.flags.includes('Travel: on-site, commutable'));
+  assert.equal(far.penalties.find((p) => p.factor.startsWith('On-site'))?.points, -15);
+  assert.ok(far.flags.includes('Review: on-site outside accepted geography'));
+});

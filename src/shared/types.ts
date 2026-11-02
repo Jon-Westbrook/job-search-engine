@@ -124,3 +124,28 @@ export const APP_CONSTANTS = {
 } as const;
 
 export const REASON_TAGS = ['Role fit', 'Seniority', 'Pay', 'Location', 'Visa', 'Stack', 'Company', 'Other'] as const;
+
+// The Network view (see src/server/network.ts).
+export interface NetworkContact {
+  name: string;
+  relationship: string;
+}
+
+export interface NetworkJob {
+  id: number;
+  title: string;
+  location: string | null;
+  score: number | null;
+  band: Band;
+  posted_at: string | null;
+  posted_estimated: boolean;
+}
+
+export interface NetworkRow {
+  company: string;
+  target: string | null;
+  contacts: NetworkContact[];
+  jobs: NetworkJob[];
+  job_count: number;
+  best_score: number | null;
+}

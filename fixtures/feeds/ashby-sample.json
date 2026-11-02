@@ -1,0 +1,7 @@
+{
+  "jobs": [
+    { "id": "a1", "title": "Forward Deployed Engineer", "location": "New York", "isListed": "True", "workplaceType": "OnSite", "publishedAt": "2026-10-28T12:00:00.000+00:00", "jobUrl": "https://jobs.ashbyhq.com/example/a1?utm=x", "descriptionPlain": "Build customer-facing AI systems with engineers and researchers in New York. Ship to production every week." },
+    { "id": "a2", "title": "Research Scientist", "location": "London", "isListed": "True", "workplaceType": "OnSite", "publishedAt": "2026-10-28T12:00:00.000+00:00", "jobUrl": "https://jobs.ashbyhq.com/example/a2", "descriptionPlain": "Research role in London with a long enough description to be stored if it were in scope." },
+    { "id": "a3", "title": "Hidden Role", "location": "New York", "isListed": "False", "workplaceType": "OnSite", "publishedAt": null, "jobUrl": "https://jobs.ashbyhq.com/example/a3", "descriptionPlain": "Not listed publicly, so it must not be kept at all." }
+  ]
+}

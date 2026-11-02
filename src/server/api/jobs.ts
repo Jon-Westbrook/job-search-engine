@@ -6,6 +6,7 @@ import { ActionError, blockJob, closeJob, mergeJobs, openListing, reopenJob, ove
 import { jobDetail, listJobs, stats, type Filter } from '../jobs/read.ts';
 import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
 import { ContactError, createContact } from '../contacts.ts';
+import { buildNetwork } from '../network.ts';
 import { activeWeightProfile, saveWeightVersion, validateWeights, WeightError } from '../score/profile.ts';
 import { normalizeCompany } from '../normalize/keys.ts';
 import { loadSnapshot } from '../tracker/import-plan.ts';
@@ -150,6 +151,10 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     mergeJobs(db, target, from, 'manual', 'kept grouped by the owner', nowIso());
     sendJson(res, 200, { ok: true });
   }));
+
+  router.get('/network', ({ res }) => {
+    sendJson(res, 200, { rows: buildNetwork(db) });
+  });
 
   router.get('/settings/weights', ({ res }) => {
     const active = activeWeightProfile(db);

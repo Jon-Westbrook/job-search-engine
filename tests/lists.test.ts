@@ -106,12 +106,16 @@ test('a contact with an unknown relationship is refused', () => {
   db.close();
 });
 
-test('the scoring queue puts a target-company job first', () => {
+test('the scoring queue puts a target-role title first, then a target company', () => {
   const { db, companies } = withJobs();
-  const pick = companies[0]!;
-  syncTargets(db, [{ name: pick }], {}, NOW);
+  syncTargets(db, [{ name: companies[0]! }], {}, NOW);
   const first = jobsNeedingScore(db, 1)[0]!;
-  const row = db.prepare('SELECT company FROM jobs WHERE id = ?').get(first) as { company: string };
-  assert.equal(row.company, pick);
+  const roleRows = db.prepare("SELECT id FROM jobs WHERE lower(title) LIKE '%forward%deploy%' OR lower(title) LIKE '%design%engineer%' OR lower(title) LIKE '%front%end%' OR lower(title) LIKE '%full%stack%' OR lower(title) LIKE '%product engineer%' OR lower(title) LIKE '%web developer%'").all() as Array<{ id: number }>;
+  if (roleRows.length > 0) {
+    assert.ok(roleRows.some((r) => r.id === first), 'a target-role job leads the queue');
+  } else {
+    const row = db.prepare('SELECT company FROM jobs WHERE id = ?').get(first) as { company: string };
+    assert.equal(row.company, companies[0]);
+  }
   db.close();
 });

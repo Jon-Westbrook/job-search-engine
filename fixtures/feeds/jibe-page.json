@@ -1,0 +1,8 @@
+{
+  "totalCount": 3,
+  "jobs": [
+    { "data": { "req_id": "100", "title": "Senior Design Engineer", "city": "New York", "state": "New York", "apply_url": "https://careers.example.com/jobs/100", "posted_date": "2026-10-29T16:05:00+0000", "description": "<p>Design systems and product engineering for global brands, based in New York.</p>", "responsibilities": "Build interactive prototypes.", "qualifications": "Five years of front-end work." } },
+    { "data": { "req_id": "101", "title": "Analyst", "city": "Boston", "state": "Massachusetts", "apply_url": "https://careers.example.com/jobs/101", "posted_date": "2026-10-29T16:05:00+0000", "description": "Boston role, not in the accepted geography." } },
+    { "data": { "req_id": "102", "title": "Account Director", "city": "Brooklyn", "state": "New York", "apply_url": "https://careers.example.com/jobs/102", "posted_date": "2026-10-27T16:05:00+0000", "description": "Client leadership role in Brooklyn for a creative team." } }
+  ]
+}

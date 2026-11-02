@@ -4,6 +4,10 @@
     { "id": "greenhouse-mozilla", "provider": "greenhouse", "board": "mozilla", "label": "Mozilla", "enabled": true },
     { "id": "greenhouse-wpp", "provider": "greenhouse", "board": "wpp", "label": "WPP", "enabled": true },
     { "id": "greenhouse-rga", "provider": "greenhouse", "board": "rga", "label": "R/GA", "enabled": true },
-    { "id": "greenhouse-headspace", "provider": "greenhouse", "board": "hs", "label": "Headspace", "enabled": true }
+    { "id": "greenhouse-headspace", "provider": "greenhouse", "board": "hs", "label": "Headspace", "enabled": true },
+    { "id": "ashby-polymarket", "provider": "ashby", "board": "polymarket", "label": "Polymarket", "enabled": true },
+    { "id": "jibe-publicis", "provider": "jibe", "base": "https://careers.publicisgroupe.com", "state": "New York", "label": "Publicis", "enabled": true, "cache_hours": 12, "delay_ms": 5000 },
+    { "id": "workday-pfizer", "provider": "workday", "host": "pfizer.wd1.myworkdayjobs.com", "site": "PfizerCareers", "label": "Pfizer", "enabled": true, "delay_ms": 1000 },
+    { "id": "workday-moderna", "provider": "workday", "host": "modernatx.wd1.myworkdayjobs.com", "site": "M_tx", "label": "Moderna", "enabled": true, "delay_ms": 1000 }
   ]
 }

@@ -43,6 +43,8 @@ export interface ScoreInput {
   extraSources: string[];
   extraction: Extraction | null;
   acceptedGeography: string[];
+  // Towns the owner will commute to on-site (by car or transit). Smaller penalty than far away.
+  commuteGeography?: string[];
   tnHostileAgencies: string[];
   companyKey: string | null;
   alreadyApplied: boolean;
@@ -318,8 +320,14 @@ export function scoreListing(input: ScoreInput): ScoreOutput {
     const loc = input.location.toLowerCase();
     const inside = input.acceptedGeography.some((g) => loc.includes(g.toLowerCase()));
     if (!inside) {
-      penalties.push({ factor: 'On-site outside accepted geography', aiValue: input.location, points: RULES_V1.penalties.onsite_outside_geography, max: 0, evidence: [], sourceField: 'location', confidence: 'high' });
-      flags.push('Review: on-site outside accepted geography');
+      const commutable = (input.commuteGeography ?? []).some((g) => loc.includes(g.toLowerCase()));
+      if (commutable) {
+        penalties.push({ factor: 'On-site, commutable from outside accepted geography', aiValue: input.location, points: RULES_V1.penalties.onsite_commutable, max: 0, evidence: [], sourceField: 'location', confidence: 'high' });
+        flags.push('Travel: on-site, commutable');
+      } else {
+        penalties.push({ factor: 'On-site outside accepted geography', aiValue: input.location, points: RULES_V1.penalties.onsite_outside_geography, max: 0, evidence: [], sourceField: 'location', confidence: 'high' });
+        flags.push('Review: on-site outside accepted geography');
+      }
     }
   }
   if (input.arrangement === 'remote' && !/\b(united states|usa|us|canada|uk|mexico|india|new york|nj|ny|ca|tx|ma|wa)\b/i.test(input.location ?? '')) {
