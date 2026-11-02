@@ -57,7 +57,10 @@ if [ -n "$UNPUSHED" ]; then
     echo "$bad_author" | cut -c1-120 | sed 's/^/  /'
     fail=1
   fi
-  bad_name=$(echo "$UNPUSHED" | grep -i -E 'jonathon|westbrook' || true)
+  # The name check reads the author name only. The noreply address is checked above, and GitHub
+  # usernames can contain a surname, so the address is not searched for the name.
+  UNPUSHED_NAMES=$(git log --format='%H %an' "@{upstream}..HEAD" 2>/dev/null || git log --format='%H %an' HEAD)
+  bad_name=$(echo "$UNPUSHED_NAMES" | grep -i -E 'jonathon|westbrook' || true)
   if [ -n "$bad_name" ]; then
     echo "BLOCKED: commit author name is personal"
     fail=1
