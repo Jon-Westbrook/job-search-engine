@@ -7,6 +7,7 @@ import { jobDetail, listJobs, stats, type Filter } from '../jobs/read.ts';
 import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
 import { ContactError, createContact } from '../contacts.ts';
 import { buildNetwork } from '../network.ts';
+import type { OwnerMessage } from '../../shared/drafts.ts';
 import { activeWeightProfile, saveWeightVersion, validateWeights, WeightError } from '../score/profile.ts';
 import { normalizeCompany } from '../normalize/keys.ts';
 import { loadSnapshot } from '../tracker/import-plan.ts';
@@ -23,6 +24,7 @@ export interface JobsApiDeps {
   lastRefreshAt: () => string | null;
   readerAuthor: string;
   scoreVersionOf: (jobId: number) => number | null;
+  ownerMessage: OwnerMessage;
 }
 
 // Wraps a route so domain errors become HTTP errors with the right status.
@@ -153,7 +155,7 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
   }));
 
   router.get('/network', ({ res }) => {
-    sendJson(res, 200, { rows: buildNetwork(db) });
+    sendJson(res, 200, { rows: buildNetwork(db), me: deps.ownerMessage });
   });
 
   router.get('/settings/weights', ({ res }) => {

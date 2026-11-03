@@ -74,4 +74,8 @@ test('drafts name the contact and the role, and end without a signature', () => 
   assert.match(withRole, /https:\/\/www\.linkedin\.com\/jobs\/view\/123\//, 'the listing link is in the message');
   const general = draftMessage('Ann Friend', 'VML', null);
   assert.match(general, /roles at VML/);
+  const signed = draftMessage('Ann Friend', 'VML', { title: 'Design Engineer', url: 'https://www.linkedin.com/jobs/view/123/' }, { name: 'Sam Example', ps: 'Call anytime.' });
+  assert.match(signed, /\nSam Example$/m);
+  assert.match(signed, /PS\. Call anytime\./);
+  assert.doesNotMatch(withRole, /PS\./, 'no PS when the profile has none');
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import type { NetworkContact, NetworkJob, NetworkRow } from '../../shared/types.ts';
-import { draftMessage } from '../../shared/drafts.ts';
+import { draftMessage, type OwnerMessage } from '../../shared/drafts.ts';
 import { postedText } from '../format.ts';
 
 // Everyone you know, grouped by company, with the open jobs there ranked by score. For a company,
@@ -31,25 +31,29 @@ interface Writing {
 
 export function Network({ onNotice }: Props) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
+  const [me, setMe] = useState<OwnerMessage>({});
   const [error, setError] = useState<string | null>(null);
   const [writing, setWriting] = useState<Writing | null>(null);
 
   useEffect(() => {
     api
-      .get<{ rows: NetworkRow[] }>('network')
-      .then((data) => setRows(data.rows))
+      .get<{ rows: NetworkRow[]; me: OwnerMessage }>('network')
+      .then((data) => {
+        setRows(data.rows);
+        setMe(data.me);
+      })
       .catch(() => setError('The network did not load. Check that the server is running.'));
   }, []);
 
   function start(row: NetworkRow) {
     if (writing?.company === row.company) return setWriting(null);
     const job = row.jobs[0] ?? null;
-    setWriting({ company: row.company, personIndex: 0, jobId: job?.id ?? null, text: messageFor(row, 0, job) });
+    setWriting({ company: row.company, personIndex: 0, jobId: job?.id ?? null, text: messageFor(row, 0, job, me) });
   }
 
   function change(row: NetworkRow, personIndex: number, jobId: number | null) {
     const job = row.jobs.find((j) => j.id === jobId) ?? null;
-    setWriting({ company: row.company, personIndex, jobId, text: messageFor(row, personIndex, job) });
+    setWriting({ company: row.company, personIndex, jobId, text: messageFor(row, personIndex, job, me) });
   }
 
   async function copy(text: string, then?: () => void) {
@@ -154,9 +158,9 @@ export function Network({ onNotice }: Props) {
   );
 }
 
-function messageFor(row: NetworkRow, personIndex: number, job: NetworkJob | null): string {
+function messageFor(row: NetworkRow, personIndex: number, job: NetworkJob | null, me: OwnerMessage): string {
   const person = row.contacts[personIndex];
-  return draftMessage(person?.name ?? '', row.company, job ? { title: job.title, url: job.url } : null);
+  return draftMessage(person?.name ?? '', row.company, job ? { title: job.title, url: job.url } : null, me);
 }
 
 function JobLine({ job }: { job: NetworkJob }) {

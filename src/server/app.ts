@@ -1,3 +1,4 @@
+import type { OwnerMessage } from '../shared/drafts.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { APP_NAME, API_VERSION } from '../shared/app.ts';
 import type { Config } from './config.ts';
@@ -11,6 +12,7 @@ import { registerExportRoutes } from './api/export.ts';
 
 export interface AppDeps extends Omit<ApiDeps, 'db'> {
   config: Config;
+  ownerMessage: OwnerMessage;
   db: Db;
   logger: Logger;
   schemaVersion: number;
@@ -39,6 +41,7 @@ export function createApp(deps: AppDeps): (req: IncomingMessage, res: ServerResp
   registerExportRoutes(router, { db: deps.db, exportDir: deps.config.exportDir, logger: deps.logger, now: () => new Date() });
   registerJobRoutes(router, {
     db: deps.db,
+    ownerMessage: deps.ownerMessage,
     snapshotPath: deps.config.snapshotPath,
     rescore: deps.rescore,
     logger: deps.logger,

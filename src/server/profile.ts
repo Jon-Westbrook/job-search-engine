@@ -8,6 +8,8 @@ export interface Profile {
   resume_summary?: string;
   tn_hostile_agencies?: string[];
   targets?: { accepted_geography?: string[]; minimum_base_usd?: number | null; target_base_usd?: number | null };
+  // The owner's sign-off for LinkedIn drafts. Local only.
+  message?: { name?: string; ps?: string };
 }
 
 export function loadProfile(path: string): Profile {

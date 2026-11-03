@@ -58,7 +58,7 @@ const rescore = async (jobId: number): Promise<void> => {
   const aiAvailable = !config.codex.rulesOnly && (await codex.status()).available;
   await scoreJob(scoring, jobId, aiAvailable);
 };
-const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount, codex, codexBin: config.codex.bin, aliases, rescore });
+const handler = createApp({ config, db, logger, schemaVersion, runner, refresh, sources, gmailAccount, codex, codexBin: config.codex.bin, aliases, rescore, ownerMessage: profile.message ?? {} });
 const server = createServer((req, res) => {
   void handler(req, res);
 });
