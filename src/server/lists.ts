@@ -57,6 +57,7 @@ export interface ContactFileEntry {
   company: string;
   relationship: string;
   profile_url?: string;
+  position?: string;
 }
 
 export const CONTACTS_PROVENANCE = 'contacts file';
@@ -73,17 +74,23 @@ export function syncContactsFromFile(db: Db, path: string, aliases: Record<strin
     if (!(CONTACT_RELATIONSHIPS as readonly string[]).includes(String(c.relationship))) {
       throw new ListError(`${path}: contact ${i + 1} relationship must be one of: ${CONTACT_RELATIONSHIPS.join(', ')}`);
     }
-    return { name: c.name.trim(), company: c.company.trim(), relationship: String(c.relationship), profile_url: c.profile_url || undefined };
+    return {
+      name: c.name.trim(),
+      company: c.company.trim(),
+      relationship: String(c.relationship),
+      profile_url: c.profile_url || undefined,
+      position: c.position || undefined,
+    };
   });
   db.exec('BEGIN');
   try {
     db.prepare('DELETE FROM contacts WHERE provenance = ?').run(CONTACTS_PROVENANCE);
     const insert = db.prepare(
-      'INSERT INTO contacts (name, company, company_key, relationship, profile_url, provenance, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO contacts (name, company, company_key, relationship, profile_url, position, provenance, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     );
     for (const e of entries) {
       const key = normalizeCompany(e.company, aliases) ?? e.company.toLowerCase();
-      insert.run(e.name, e.company, key, e.relationship, e.profile_url ?? null, CONTACTS_PROVENANCE, nowIso);
+      insert.run(e.name, e.company, key, e.relationship, e.profile_url ?? null, e.position ?? null, CONTACTS_PROVENANCE, nowIso);
     }
     db.exec('COMMIT');
   } catch (err) {

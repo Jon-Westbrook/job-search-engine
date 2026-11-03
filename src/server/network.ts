@@ -21,8 +21,8 @@ const JOBS_SHOWN = 3;
 
 export function buildNetwork(db: Db): NetworkRow[] {
   const contacts = db
-    .prepare('SELECT name, company, company_key, relationship, profile_url FROM contacts WHERE company_key IS NOT NULL ORDER BY name')
-    .all() as Array<{ name: string; company: string; company_key: string; relationship: string | null; profile_url: string | null }>;
+    .prepare('SELECT name, company, company_key, relationship, profile_url, position FROM contacts WHERE company_key IS NOT NULL ORDER BY name')
+    .all() as Array<{ name: string; company: string; company_key: string; relationship: string | null; profile_url: string | null; position: string | null }>;
   if (contacts.length === 0) return [];
 
   const jobKeys = new Map(
@@ -36,7 +36,7 @@ export function buildNetwork(db: Db): NetworkRow[] {
   const byKey = new Map<string, { company: string; contacts: NetworkContact[] }>();
   for (const c of contacts) {
     const row = byKey.get(c.company_key) ?? { company: c.company, contacts: [] };
-    row.contacts.push({ name: c.name, relationship: c.relationship ?? 'connection', profile_url: c.profile_url });
+    row.contacts.push({ name: c.name, relationship: c.relationship ?? 'connection', profile_url: c.profile_url, position: c.position });
     byKey.set(c.company_key, row);
   }
 

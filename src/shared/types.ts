@@ -130,6 +130,7 @@ export interface NetworkContact {
   name: string;
   relationship: string;
   profile_url: string | null;
+  position: string | null;
 }
 
 export interface NetworkJob {

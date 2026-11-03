@@ -4,8 +4,9 @@ import type { NetworkContact, NetworkJob, NetworkRow } from '../../shared/types.
 import { draftMessage } from '../../shared/drafts.ts';
 import { postedText } from '../format.ts';
 
-// Everyone you know, grouped by company, with the open jobs there ranked by score. A draft is
-// written for you to edit. Copy it, or copy and open the person on LinkedIn; you send it yourself.
+// Everyone you know, grouped by company, with the open jobs there ranked by score. For a company,
+// pick the person and the role, and the draft includes the listing link. Copy it, or copy and open
+// the person on LinkedIn. You send it yourself; the app never sends a message.
 
 const RELATIONSHIP: Record<string, string> = {
   friend: 'Friend',
@@ -21,10 +22,9 @@ interface Props {
   onNotice: (message: string) => void;
 }
 
-interface OpenDraft {
-  key: string;
-  contact: NetworkContact;
+interface Writing {
   company: string;
+  personIndex: number;
   jobId: number | null;
   text: string;
 }
@@ -32,7 +32,7 @@ interface OpenDraft {
 export function Network({ onNotice }: Props) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<OpenDraft | null>(null);
+  const [writing, setWriting] = useState<Writing | null>(null);
 
   useEffect(() => {
     api
@@ -41,18 +41,15 @@ export function Network({ onNotice }: Props) {
       .catch(() => setError('The network did not load. Check that the server is running.'));
   }, []);
 
-  function openDraft(row: NetworkRow, contact: NetworkContact) {
-    const key = `${row.company}|${contact.name}`;
-    if (draft?.key === key) return setDraft(null);
-    const jobId = row.jobs[0]?.id ?? null;
+  function start(row: NetworkRow) {
+    if (writing?.company === row.company) return setWriting(null);
     const job = row.jobs[0] ?? null;
-    setDraft({ key, contact, company: row.company, jobId, text: draftMessage(contact.name, row.company, job?.title ?? null) });
+    setWriting({ company: row.company, personIndex: 0, jobId: job?.id ?? null, text: messageFor(row, 0, job) });
   }
 
-  function pickJob(row: NetworkRow, jobId: number | null) {
-    if (!draft) return;
+  function change(row: NetworkRow, personIndex: number, jobId: number | null) {
     const job = row.jobs.find((j) => j.id === jobId) ?? null;
-    setDraft({ ...draft, jobId, text: draftMessage(draft.contact.name, row.company, job?.title ?? null) });
+    setWriting({ company: row.company, personIndex, jobId, text: messageFor(row, personIndex, job) });
   }
 
   async function copy(text: string, then?: () => void) {
@@ -73,55 +70,93 @@ export function Network({ onNotice }: Props) {
       <h1 className="title">Network</h1>
       {rows.length === 0 && <p className="empty">No contacts yet. Add them to config/contacts.local.json.</p>}
       <ul className="network-list">
-        {rows.map((row) => (
-          <li key={row.company} className="network-row">
-            <div className="network-company">
-              <p className="role">
-                {row.company} {row.target && <span className="tg dir">Target</span>}
-              </p>
-              <p className="sub">
-                {row.contacts.length} {row.contacts.length === 1 ? 'person' : 'people'} / {row.job_count > 0 ? `${row.job_count} open ${row.job_count === 1 ? 'job' : 'jobs'}` : 'no open jobs'}
-              </p>
-            </div>
+        {rows.map((row) => {
+          const open = writing?.company === row.company ? writing : null;
+          const person = open ? row.contacts[open.personIndex] ?? null : null;
+          return (
+            <li key={row.company} className="network-row">
+              <div className="network-company">
+                <p className="role">
+                  {row.company} {row.target && <span className="tg dir">Target</span>}
+                </p>
+                <p className="sub">
+                  {row.contacts.length} {row.contacts.length === 1 ? 'person' : 'people'} / {row.job_count > 0 ? `${row.job_count} open ${row.job_count === 1 ? 'job' : 'jobs'}` : 'no open jobs'}
+                </p>
+                {row.job_count > 0 && (
+                  <button type="button" className="btn" aria-expanded={!!open} onClick={() => start(row)}>
+                    {open ? 'Close' : 'Write message'}
+                  </button>
+                )}
+              </div>
 
-            <ul className="network-jobs">
-              {row.jobs.map((j) => (
-                <JobLine key={j.id} job={j} />
-              ))}
-              {row.job_count > row.jobs.length && <li className="sub">and {row.job_count - row.jobs.length} more in the Inbox</li>}
-            </ul>
+              <ul className="network-jobs">
+                {row.jobs.map((j) => (
+                  <JobLine key={j.id} job={j} />
+                ))}
+                {row.job_count > row.jobs.length && <li className="sub">and {row.job_count - row.jobs.length} more in the Inbox</li>}
+              </ul>
 
-            <div className="network-people">
-              {row.contacts.map((c) => {
-                const key = `${row.company}|${c.name}`;
-                const open = draft?.key === key;
-                return (
-                  <div key={key} className="network-person">
-                    <span>
-                      {c.name} <span className="tg">{RELATIONSHIP[c.relationship] ?? c.relationship}</span>
-                    </span>
-                    <button type="button" className="btn" aria-expanded={open} onClick={() => openDraft(row, c)}>
-                      {open ? 'Close' : 'Draft message'}
-                    </button>
-                    {open && draft && (
-                      <DraftBox
-                        draft={draft}
-                        row={row}
-                        onPickJob={(id) => pickJob(row, id)}
-                        onEdit={(text) => setDraft({ ...draft, text })}
-                        onCopy={() => copy(draft.text)}
-                        onOpen={() => copy(draft.text, () => window.open(linkedInPlace(draft.contact, row.company), '_blank', 'noopener'))}
-                      />
-                    )}
+              <div className="network-people">
+                {row.contacts.map((c) => (
+                  <div key={`${row.company}|${c.name}`} className="network-person">
+                    <span>{c.name}</span>
+                    {c.position && <span className="sub">{c.position}</span>}
+                    <span className="tg">{RELATIONSHIP[c.relationship] ?? c.relationship}</span>
                   </div>
-                );
-              })}
-            </div>
-          </li>
-        ))}
+                ))}
+
+                {open && person && (
+                  <div className="network-draft">
+                    <label className="field-label" htmlFor={`person-${row.company}`}>Person</label>
+                    <select id={`person-${row.company}`} value={open.personIndex} onChange={(e) => change(row, Number(e.target.value), open.jobId)}>
+                      {row.contacts.map((c, i) => (
+                        <option key={c.name} value={i}>
+                          {c.name}
+                          {c.position ? ` / ${c.position}` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label className="field-label" htmlFor={`role-${row.company}`}>Role</label>
+                    <select id={`role-${row.company}`} value={open.jobId ?? ''} onChange={(e) => change(row, open.personIndex, e.target.value ? Number(e.target.value) : null)}>
+                      {row.jobs.map((j) => (
+                        <option key={j.id} value={j.id}>
+                          {j.title}
+                        </option>
+                      ))}
+                      <option value="">No specific role</option>
+                    </select>
+
+                    {open.jobId !== null && (
+                      <a href={row.jobs.find((j) => j.id === open.jobId)?.url} target="_blank" rel="noreferrer">
+                        Open the listing to check it
+                      </a>
+                    )}
+
+                    <textarea rows={6} value={open.text} onChange={(e) => setWriting({ ...open, text: e.target.value })} aria-label="Draft message" />
+
+                    <div className="network-draft-actions">
+                      <button type="button" className="btn" onClick={() => copy(open.text)}>
+                        Copy draft
+                      </button>
+                      <button type="button" className="btn btn-dark" onClick={() => copy(open.text, () => window.open(linkedInPlace(person, row.company), '_blank', 'noopener'))}>
+                        Copy and open LinkedIn
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
+}
+
+function messageFor(row: NetworkRow, personIndex: number, job: NetworkJob | null): string {
+  const person = row.contacts[personIndex];
+  return draftMessage(person?.name ?? '', row.company, job ? { title: job.title, url: job.url } : null);
 }
 
 function JobLine({ job }: { job: NetworkJob }) {
@@ -142,49 +177,4 @@ function JobLine({ job }: { job: NetworkJob }) {
 export function linkedInPlace(contact: NetworkContact, company: string): string {
   if (contact.profile_url) return contact.profile_url;
   return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${contact.name} ${company}`)}`;
-}
-
-function DraftBox({
-  draft,
-  row,
-  onPickJob,
-  onEdit,
-  onCopy,
-  onOpen,
-}: {
-  draft: OpenDraft;
-  row: NetworkRow;
-  onPickJob: (id: number | null) => void;
-  onEdit: (text: string) => void;
-  onCopy: () => void;
-  onOpen: () => void;
-}) {
-  const job = row.jobs.find((j) => j.id === draft.jobId) ?? null;
-  return (
-    <div className="network-draft">
-      <label className="field-label" htmlFor={`draft-job-${draft.key}`}>Role to mention</label>
-      <select id={`draft-job-${draft.key}`} value={draft.jobId ?? ''} onChange={(e) => onPickJob(e.target.value ? Number(e.target.value) : null)}>
-        {row.jobs.map((j) => (
-          <option key={j.id} value={j.id}>
-            {j.title}
-          </option>
-        ))}
-        <option value="">No specific role</option>
-      </select>
-      {job && (
-        <a href={job.url} target="_blank" rel="noreferrer">
-          Open the listing to check it
-        </a>
-      )}
-      <textarea rows={5} value={draft.text} onChange={(e) => onEdit(e.target.value)} aria-label="Draft message" />
-      <div className="network-draft-actions">
-        <button type="button" className="btn" onClick={onCopy}>
-          Copy draft
-        </button>
-        <button type="button" className="btn btn-dark" onClick={onOpen}>
-          Copy and open LinkedIn
-        </button>
-      </div>
-    </div>
-  );
 }
