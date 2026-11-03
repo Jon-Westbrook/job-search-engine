@@ -12,7 +12,7 @@ export function draftMessage(contactName: string, company: string, job: { title:
   const body = job
     ? `I'm looking at the ${job.title} role at ${company}:\n${job.url}\n\nWould you be open to maybe referring me?`
     : `I'm looking at roles at ${company}. Would you be open to a quick chat, or maybe a referral?`;
-  const lines = [`Hi ${first}, how's it going?!`, '', body, '', 'Thank you!'];
+  const lines = [`Hi ${first}, how's it going?! Long time.`, '', body, '', 'Thank you!'];
   if (owner.name) lines.push(owner.name);
   if (owner.ps) lines.push('', `PS. ${owner.ps}`);
   return lines.join('\n');
