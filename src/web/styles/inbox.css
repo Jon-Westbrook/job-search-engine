@@ -1133,7 +1133,8 @@ textarea {
 
   .bottom-nav {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     position: fixed;
     left: 0;
     right: 0;
@@ -1533,4 +1534,47 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* Follow-up: due, waiting, and done */
+
+.followup {
+  padding: 24px 28px;
+  min-width: 0;
+}
+
+.followup-group {
+  margin-top: 20px;
+}
+
+.followup-group.muted {
+  opacity: 0.7;
+}
+
+.followup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.followup-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: var(--border);
+}
+
+.followup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .followup {
+    padding: 16px;
+  }
 }

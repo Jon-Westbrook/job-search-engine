@@ -7,6 +7,7 @@ import { jobDetail, listJobs, stats, type Filter } from '../jobs/read.ts';
 import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
 import { ContactError, createContact } from '../contacts.ts';
 import { buildNetwork } from '../network.ts';
+import { listOutreach, recordOutreach, updateOutreach } from '../outreach.ts';
 import type { OwnerMessage } from '../../shared/drafts.ts';
 import { activeWeightProfile, saveWeightVersion, validateWeights, WeightError } from '../score/profile.ts';
 import { normalizeCompany } from '../normalize/keys.ts';
@@ -155,7 +156,7 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
   }));
 
   router.get('/network', ({ res }) => {
-    sendJson(res, 200, { rows: buildNetwork(db), me: deps.ownerMessage });
+    sendJson(res, 200, { rows: buildNetwork(db, nowIso()), me: deps.ownerMessage });
   });
 
   router.get('/settings/weights', ({ res }) => {
@@ -211,6 +212,27 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     const status = (body.status ?? '') as ApplicationStatus;
     if (!(APPLICATION_STATUSES as readonly string[]).includes(status)) throw new HttpError(400, 'Unknown status', 'bad_request');
     updateApplicationStatus(db, Number(params.id), status, body.note ?? null, nowIso());
+    sendJson(res, 200, { ok: true });
+  }));
+
+  // LinkedIn outreach. The owner marks each step by hand; the app never sends or reads LinkedIn.
+  router.get('/outreach', ({ res }) => {
+    sendJson(res, 200, { items: listOutreach(db, nowIso()), me: deps.ownerMessage });
+  });
+
+  router.post('/outreach', guard(async ({ res, json }) => {
+    const body = await json<{ person_key?: string; job_id?: number | null }>();
+    const personKeyParam = String(body.person_key ?? '');
+    if (!personKeyParam) throw new HttpError(400, 'A person is needed', 'bad_request');
+    const jobIdParam = body.job_id === null || body.job_id === undefined ? null : Number(body.job_id);
+    if (jobIdParam !== null && (!Number.isInteger(jobIdParam) || jobIdParam < 1)) throw new HttpError(400, 'Job ID must be a whole number', 'bad_request');
+    const id = recordOutreach(db, { person_key: personKeyParam, job_id: jobIdParam }, nowIso());
+    sendJson(res, 201, { id });
+  }));
+
+  router.patch('/outreach/:id', guard(async ({ res, params, json }) => {
+    const body = await json<{ action?: string }>();
+    updateOutreach(db, Number(params.id), String(body.action ?? ''), nowIso());
     sendJson(res, 200, { ok: true });
   }));
 

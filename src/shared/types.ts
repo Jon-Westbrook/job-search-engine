@@ -39,6 +39,7 @@ export interface JobListItem {
   applied: { date: string | null; reason: string; status: string } | null;
   in_analysis: { reason: string } | null;
   target: string | null;
+  asked: string | null;
   closed: { at: string; reason: string } | null;
   possible_duplicate: boolean;
   source_count: number;
@@ -127,6 +128,7 @@ export const REASON_TAGS = ['Role fit', 'Seniority', 'Pay', 'Location', 'Visa', 
 
 // The Network view (see src/server/network.ts).
 export interface NetworkContact {
+  key: string;
   name: string;
   relationship: string;
   profile_url: string | null;
@@ -151,4 +153,24 @@ export interface NetworkRow {
   jobs: NetworkJob[];
   job_count: number;
   best_score: number | null;
+  outreach: OutreachRecord[];
+}
+
+// A message sent to a person, and where it stands. Days count from the last contact.
+export interface OutreachRecord {
+  id: number;
+  person_key: string;
+  person_name: string;
+  person_url: string | null;
+  company: string;
+  company_key: string;
+  job_id: number | null;
+  job_title: string | null;
+  job_url: string | null;
+  status: 'sent' | 'replied' | 'referred' | 'dropped';
+  sent_at: string;
+  last_contact_at: string;
+  followups: number;
+  days: number;
+  due: boolean;
 }

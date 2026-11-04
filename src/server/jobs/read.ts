@@ -3,6 +3,7 @@ import { findApplicationMatch, type ApplicationMatch } from '../applications.ts'
 import { weakMatchesFor } from '../grouping.ts';
 import { GOOD_FIT_THRESHOLD, REVIEW_THRESHOLD } from '../../shared/app.ts';
 import { earliestAlertAt } from './posted.ts';
+import { askedFor } from '../outreach.ts';
 import type { Band, Confidence, Filter, JobListItem, Verdict } from '../../shared/types.ts';
 
 export type { Band, Filter, JobListItem };
@@ -107,6 +108,13 @@ export function payText(row: JobRow): JobListItem['pay'] {
 
 const APPLIED_STATUSES = new Set(['applied', 'interviewing', 'rejected', 'offer']);
 
+// Who was asked about this role, in a short tag: one name, or a count.
+function askedText(db: Db, jobId: number): string | null {
+  const names = askedFor(db, jobId);
+  if (names.length === 0) return null;
+  return names.length === 1 ? `Asked ${names[0]}` : `Asked ${names.length} people`;
+}
+
 function toItem(db: Db, row: JobRow): JobListItem {
   const flags = parseList(row.flags);
   const missing = parseList(row.missing);
@@ -136,6 +144,7 @@ function toItem(db: Db, row: JobRow): JobListItem {
     blocked: blockedAt ? { at: blockedAt, reason: row.blocked_reason ?? '' } : null,
     closed: row.closed_at ? { at: row.closed_at, reason: row.closed_reason ?? '' } : null,
     target: row.target_name,
+    asked: askedText(db, row.id),
     rule_blocked: row.rule_blocked === 1,
     // Only a status past Saved counts as applied. A progressed job is Saved and shows In Analysis.
     applied: match && APPLIED_STATUSES.has(match.status) ? { date: match.applied_at, reason: match.reason, status: match.status } : null,

@@ -17,3 +17,15 @@ export function draftMessage(contactName: string, company: string, job: { title:
   if (owner.ps) lines.push('', `PS. ${owner.ps}`);
   return lines.join('\n');
 }
+
+// A follow-up to a message that has had no reply. Shorter, and it keeps the listing link.
+export function followUpMessage(contactName: string, company: string, job: { title: string; url: string } | null, owner: OwnerMessage = {}): string {
+  const first = contactName.split(' ')[0] ?? contactName;
+  const body = job
+    ? `Just following up on my note about the ${job.title} role at ${company}:\n${job.url}\n\nWould it be easier to talk for a few minutes? Thanks again!`
+    : `Just following up on my note about roles at ${company}. Would it be easier to talk for a few minutes? Thanks again!`;
+  const lines = [`Hi ${first}, hope you're doing well!`, '', body];
+  if (owner.name) lines.push('', owner.name);
+  if (owner.ps) lines.push('', `PS. ${owner.ps}`);
+  return lines.join('\n');
+}

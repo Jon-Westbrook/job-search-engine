@@ -6,11 +6,13 @@ import { SetupDialog } from './setup/SetupDialog.tsx';
 import { WeightsDialog } from './settings/Weights.tsx';
 import { Tracker } from './tracker/Tracker.tsx';
 import { Network } from './network/Network.tsx';
+import { FollowUp } from './followup/FollowUp.tsx';
 
-type Tab = 'inbox' | 'network' | 'analysis' | 'submit' | 'tracker';
+type Tab = 'inbox' | 'network' | 'followup' | 'analysis' | 'submit' | 'tracker';
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'inbox', label: 'Inbox' },
   { key: 'network', label: 'Network' },
+  { key: 'followup', label: 'Follow-up' },
   { key: 'analysis', label: 'Analysis' },
   { key: 'submit', label: 'Submit' },
   { key: 'tracker', label: 'Tracker' },
@@ -69,6 +71,8 @@ export function App() {
           />
         ) : tab === 'network' ? (
           <Network onNotice={flash} />
+        ) : tab === 'followup' ? (
+          <FollowUp onNotice={flash} />
         ) : tab === 'tracker' ? (
           <Tracker onNotice={flash} />
         ) : (

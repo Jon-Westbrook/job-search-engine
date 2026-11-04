@@ -1,6 +1,8 @@
 import type { Db } from './db/index.ts';
 import { listJobs } from './jobs/read.ts';
-import type { NetworkContact, NetworkJob, NetworkRow } from '../shared/types.ts';
+import type { NetworkContact, NetworkJob, NetworkRow, OutreachRecord } from '../shared/types.ts';
+import { personKey } from '../shared/person.ts';
+import { listOutreach } from './outreach.ts';
 
 // The Network view: people you know, grouped by the company they work at, with the open jobs
 // at that company ranked by score. Contacts come from config/contacts.local.json. Nothing here
@@ -19,7 +21,7 @@ const RELATIONSHIP_RANK: Record<string, number> = {
 
 const JOBS_SHOWN = 3;
 
-export function buildNetwork(db: Db): NetworkRow[] {
+export function buildNetwork(db: Db, nowIso: string = new Date().toISOString()): NetworkRow[] {
   const contacts = db
     .prepare('SELECT name, company, company_key, relationship, profile_url, position FROM contacts WHERE company_key IS NOT NULL ORDER BY name')
     .all() as Array<{ name: string; company: string; company_key: string; relationship: string | null; profile_url: string | null; position: string | null }>;
@@ -32,11 +34,12 @@ export function buildNetwork(db: Db): NetworkRow[] {
   const targets = new Map((db.prepare('SELECT company_key, name FROM targets').all() as Array<{ company_key: string; name: string }>).map((r) => [r.company_key, r.name]));
   // Open jobs only: not blocked, not rule-blocked, not closed on LinkedIn.
   const openJobs = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).items;
+  const outreach = listOutreach(db, nowIso);
 
   const byKey = new Map<string, { company: string; contacts: NetworkContact[] }>();
   for (const c of contacts) {
     const row = byKey.get(c.company_key) ?? { company: c.company, contacts: [] };
-    row.contacts.push({ name: c.name, relationship: c.relationship ?? 'connection', profile_url: c.profile_url, position: c.position });
+    row.contacts.push({ key: personKey(c.name, c.company_key, c.profile_url), name: c.name, relationship: c.relationship ?? 'connection', profile_url: c.profile_url, position: c.position });
     byKey.set(c.company_key, row);
   }
 
@@ -62,6 +65,7 @@ export function buildNetwork(db: Db): NetworkRow[] {
       })),
       job_count: jobs.length,
       best_score: jobs[0]?.score ?? null,
+      outreach: outreach.filter((o: OutreachRecord) => o.company_key === key),
     });
   }
 

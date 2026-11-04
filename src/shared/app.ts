@@ -11,3 +11,5 @@ export const RULE_BLOCK_CAP = 5;
 
 // Undo window for Block, from brief section 12.2 and section 19.
 export const BLOCK_UNDO_WINDOW_MS = 5000;
+// An outreach message with no reply is due for a follow-up after this many days.
+export const FOLLOW_UP_DAYS = 7;
