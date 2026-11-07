@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { validateViews } from '../src/server/saved-views.ts';
 import assert from 'node:assert/strict';
 import { decisionOf } from '../src/shared/decision.ts';
 import { SOURCE_CHANNELS, SOURCE_CHANNEL_KEYS, isSourceChannel } from '../src/shared/channels.ts';
@@ -48,4 +49,10 @@ test('results count each job once per decision, by channel and by score band', (
   assert.equal(good.opened, 1);
   assert.equal(results.by_band.find((r) => r.key === 'unscored')!.not_available, 1);
   assert.equal(results.by_band.find((r) => r.key === 'low')!.progressed, 1);
+});
+
+test('saved views keep a name, a filter, and short search text, and refuse the rest', () => {
+  assert.deepEqual(validateViews([{ name: ' Omnicom ', filter: 'targets', q: 'omnicom' }]), [{ name: 'Omnicom', filter: 'targets', q: 'omnicom' }]);
+  assert.throws(() => validateViews([{ name: '', filter: 'targets', q: '' }]));
+  assert.throws(() => validateViews('nope'));
 });

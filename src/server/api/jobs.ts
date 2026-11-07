@@ -5,7 +5,8 @@ import { HttpError, type Router, type RouteHandler, sendJson } from '../http/rou
 import { ActionError, blockJob, closeJob, mergeJobs, openListing, reopenJob, overrideBlock, setDescription, setVerdict, splitPosting, undoBlock } from '../jobs/actions.ts';
 import { jobDetail, listJobs, loadItems, stats, type Filter } from '../jobs/read.ts';
 import { decisionResults } from '../jobs/results.ts';
-import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
+import { ProgressBlocked, progressJob, createApplication, findApplicationMatch, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
+import { saveViews, savedViews, validateViews } from '../saved-views.ts';
 import { ContactError, createContact } from '../contacts.ts';
 import { buildNetwork } from '../network.ts';
 import { listOutreach, recordOutreach, updateOutreach } from '../outreach.ts';
@@ -52,6 +53,9 @@ function jobId(params: Record<string, string>): number {
   return id;
 }
 
+const BATCH_ACTIONS = ['progress', 'applied', 'not_interested', 'bring_back', 'not_available', 'reopen'] as const;
+type BatchAction = (typeof BATCH_ACTIONS)[number];
+
 const FILTERS: Filter[] = ['all', 'undecided', 'good', 'review', 'progressed', 'not_interested', 'not_available', 'blocked', 'targets'];
 const SORTS = ['score', 'age', 'pay', 'confidence', 'targets'] as const;
 
@@ -91,17 +95,73 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
     sendJson(res, 200, { feedback_id: id });
   }));
 
-  router.post('/jobs/:id/progress', guard(async ({ res, params, json }) => {
-    const body = await json<{ reason?: string | null }>().catch(() => ({} as { reason?: string | null }));
-    const id = jobId(params);
+  // Progress and the batch path share one check, so a blocked or closed job is refused the same way.
+  const progressOne = (id: number, reason: string | null) => {
     const job = db.prepare('SELECT id, canonical_url, title, company, company_key, title_key, blocked_at, rule_blocked, closed_at FROM jobs WHERE id = ?').get(id) as
       | { id: number; canonical_url: string; title: string; company: string | null; company_key: string | null; title_key: string | null; blocked_at: string | null; rule_blocked: number; closed_at: string | null }
       | undefined;
     if (!job) throw new HttpError(404, 'Job not found', 'not_found');
     if (job.blocked_at || job.rule_blocked) throw new HttpError(409, 'A blocked job cannot be progressed. Override it first.', 'conflict');
     if (job.closed_at) throw new HttpError(409, 'This job is closed on LinkedIn. It can be progressed again if it is relisted.', 'conflict');
-    const out = progressJob(db, job, { reason: body.reason ?? null, scoreVersion: deps.scoreVersionOf(id), nowIso: nowIso(), aliases: deps.aliases });
+    return progressJob(db, job, { reason, scoreVersion: deps.scoreVersionOf(id), nowIso: nowIso(), aliases: deps.aliases });
+  };
+
+  router.post('/jobs/:id/progress', guard(async ({ res, params, json }) => {
+    const body = await json<{ reason?: string | null }>().catch(() => ({} as { reason?: string | null }));
+    const out = progressOne(jobId(params), body.reason ?? null);
     sendJson(res, 200, { application_id: out.applicationId, stage: 'analysis', button: 'Saved to Analysis' });
+  }));
+
+  // Marks the progressed job's application as applied, once the owner has sent it.
+  const markApplied = (id: number, now: string) => {
+    const job = db.prepare('SELECT id, canonical_url, company_key, title_key FROM jobs WHERE id = ?').get(id) as
+      | { id: number; canonical_url: string; company_key: string | null; title_key: string | null }
+      | undefined;
+    if (!job) throw new HttpError(404, 'Job not found', 'not_found');
+    const match = findApplicationMatch(db, job);
+    if (!match) throw new HttpError(409, 'This job has not been progressed', 'conflict');
+    updateApplicationStatus(db, match.application_id, 'applied', null, now);
+  };
+
+  const decide = (id: number, action: BatchAction) => {
+    const now = nowIso();
+    if (action === 'progress') progressOne(id, null);
+    else if (action === 'applied') markApplied(id, now);
+    else if (action === 'not_interested') setVerdict(db, id, 'bad', [], null, now);
+    else if (action === 'bring_back') setVerdict(db, id, 'maybe', [], null, now);
+    else if (action === 'not_available') closeJob(db, id, 'Not available on LinkedIn', now);
+    else reopenJob(db, id, now);
+  };
+
+  // One request for a whole selection. Each job is checked on its own, so one that cannot change does not stop the rest.
+  router.post('/jobs/batch', guard(async ({ res, json }) => {
+    const body = await json<{ ids?: unknown; action?: unknown }>();
+    const ids = Array.isArray(body.ids) ? body.ids.map(Number) : [];
+    if (ids.length === 0 || ids.length > 500 || ids.some((n) => !Number.isInteger(n) || n < 1)) {
+      throw new HttpError(400, 'Choose between 1 and 500 jobs', 'bad_request');
+    }
+    if (!(BATCH_ACTIONS as readonly unknown[]).includes(body.action)) throw new HttpError(400, 'Unknown action', 'bad_request');
+    const action = body.action as BatchAction;
+    const failed: number[] = [];
+    for (const id of ids) {
+      try {
+        decide(id, action);
+      } catch {
+        failed.push(id);
+      }
+    }
+    sendJson(res, 200, { done: ids.length - failed.length, failed });
+  }));
+
+  router.get('/views', ({ res }) => {
+    sendJson(res, 200, { views: savedViews(db) });
+  });
+
+  router.post('/views', guard(async ({ res, json }) => {
+    const body = await json<{ views?: unknown }>();
+    const views = validateViews(body.views);
+    saveViews(db, views, nowIso());
+    sendJson(res, 200, { views });
   }));
 
   router.post('/jobs/:id/block', guard(async ({ res, params, json }) => {

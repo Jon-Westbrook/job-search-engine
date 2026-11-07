@@ -132,7 +132,7 @@ export interface RefreshStatus {
 
 export interface WeightProfileView {
   version: number;
-  weights: Record<'tn' | 'role' | 'direct' | 'recency' | 'compensation' | 'effort', number>;
+  weights: Record<'tn' | 'role' | 'target_role' | 'direct' | 'recency' | 'compensation' | 'effort', number>;
   reason: string | null;
   author: string;
   created_at: string;
@@ -193,4 +193,11 @@ export interface OutreachRecord {
   followups: number;
   days: number;
   due: boolean;
+}
+
+// A named Inbox view: the filter and the search text. Saved on the server.
+export interface SavedView {
+  name: string;
+  filter: string;
+  q: string;
 }

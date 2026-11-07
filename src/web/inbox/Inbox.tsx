@@ -1,31 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '../api.ts';
-import type { DirectFilter, Filter, JobListItem, JobsResponse, RefreshStatus, ResultRow, ResultsResponse } from '../../shared/types.ts';
+import type { DirectFilter, Filter, JobListItem, JobsResponse, RefreshStatus, ResultRow, ResultsResponse, SavedView } from '../../shared/types.ts';
 import { clock } from '../format.ts';
 import { RefreshDialog } from './RefreshDialog.tsx';
-import { JobList, SORT_KEYS, defaultDir, sortJobs, type Decide, type SortKey, type SortState } from './JobList.tsx';
+import { JobList, SORT_KEYS, defaultDir, matchesSearch, sortJobs, type Decide, type SortKey, type SortState } from './JobList.tsx';
 import { useSmallScreen } from '../hooks.ts';
 
 const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'undecided', label: 'Undecided' },
   { key: 'good', label: 'Good fit' },
-  { key: 'review', label: 'Review' },
+  { key: 'targets', label: 'Targets' },
   { key: 'progressed', label: 'Progressed' },
   { key: 'not_interested', label: 'Not interested' },
   { key: 'not_available', label: 'Not available' },
-  { key: 'blocked', label: 'Blocked' },
 ];
 const FILTER_KEYS = FILTERS.map((f) => f.key);
 const DIRECTS: DirectFilter[] = ['any', 'tier1', 'tier2plus'];
 const DIRECT_LABEL: Record<DirectFilter, string> = { any: 'any', tier1: 'tier 1', tier2plus: 'tier 2 or higher' };
-// The list renders this many rows at a time. The rest appear on request, so a long queue stays quick.
+// The list renders this many rows at a time. The rest appear on request.
 const CHUNK = 150;
-const NOTICE: Record<Decide, string> = {
-  progress: 'Saved to Analysis.',
-  not_interested: 'Marked not interested.',
-  not_available: 'Marked not available.',
-  bring_back: 'Brought back to Undecided.',
-  reopen: 'Reopened.',
+const DONE: Record<Decide, string> = {
+  progress: 'saved to Analysis',
+  applied: 'marked applied',
+  not_interested: 'marked not interested',
+  not_available: 'marked not available',
+  bring_back: 'brought back to Undecided',
+  reopen: 'reopened',
 };
 
 interface Stats {
@@ -55,9 +55,13 @@ export function Inbox(props: {
     return { key, dir: readParam('dir', ['asc', 'desc'] as const, defaultDir(key)) };
   });
   const [direct, setDirect] = useState<DirectFilter>(() => readParam('direct', DIRECTS, 'any'));
+  const [query, setQuery] = useState('');
   const [data, setData] = useState<JobsResponse | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [results, setResults] = useState<ResultsResponse | null>(null);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [viewName, setViewName] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [shown, setShown] = useState(CHUNK);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<RefreshStatus | null>(null);
@@ -66,7 +70,7 @@ export function Inbox(props: {
   const [cancelling, setCancelling] = useState(false);
   const wasRunning = useRef(false);
 
-  // Keep the filters and sort in the URL so they survive a reload.
+  // Filters and sort stay in the URL so they survive a reload.
   useEffect(() => {
     const p = new URLSearchParams();
     p.set('filter', filter);
@@ -76,8 +80,10 @@ export function Inbox(props: {
     window.history.replaceState(null, '', `?${p.toString()}`);
   }, [filter, sort, direct]);
 
+  // A new view starts with a clear selection and the first page of rows.
   useEffect(() => {
     setShown(CHUNK);
+    setSelected(new Set());
   }, [filter, direct]);
 
   const load = useCallback(async () => {
@@ -95,6 +101,13 @@ export function Inbox(props: {
   useEffect(() => {
     void load();
   }, [load, props.refreshSignal]);
+
+  useEffect(() => {
+    api
+      .get<{ views: SavedView[] }>('views')
+      .then((d) => setViews(d.views))
+      .catch(() => undefined);
+  }, []);
 
   // Poll the refresh only while it runs. Nothing polls on a timer otherwise.
   const { onRefreshStatus } = props;
@@ -136,7 +149,6 @@ export function Inbox(props: {
     return () => window.clearInterval(t);
   }, [running, pollRefresh, load]);
 
-  // Writes the ranked export file. The button shows the checksum and time in the notice.
   const exportFile = async () => {
     setBusy(true);
     try {
@@ -163,12 +175,32 @@ export function Inbox(props: {
     }
   };
 
-  const sorted = useMemo(() => sortJobs(data?.items ?? [], sort), [data, sort]);
+  const sorted = useMemo(() => sortJobs((data?.items ?? []).filter((j) => matchesSearch(j, query)), sort), [data, sort, query]);
   const visible = sorted.slice(0, shown);
 
   // A new column starts in its default direction. The same column again reverses it.
   const onSort = (key: SortKey) => {
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: defaultDir(key) }));
+  };
+
+  const pick = (id: number) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const pickAll = (ids: number[], on: boolean) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
   };
 
   // On a phone the listing opens in a new tab. On a computer it opens in one small window that is
@@ -179,20 +211,41 @@ export function Inbox(props: {
     api.post(`jobs/${job.id}/listing-opened`, {}).catch(() => undefined);
   };
 
-  // Every decision removes the row at once. The request runs behind it. If it fails, the list reloads.
+  // A decision on a row applies to every selected row when the row is one of several selected.
+  // Rows leave the list at once. The request runs behind them, and rows it could not change come back.
   const decide = async (job: JobListItem, action: Decide) => {
-    setData((d) => d && { ...d, items: d.items.filter((j) => j.id !== job.id), counts: { ...d.counts, [filter]: Math.max(0, (d.counts[filter] ?? 0) - 1) } });
+    const ids = selected.has(job.id) && selected.size > 1 ? [...selected] : [job.id];
+    const gone = new Set(ids);
+    setData((d) => d && { ...d, items: d.items.filter((j) => !gone.has(j.id)), counts: { ...d.counts, [filter]: Math.max(0, (d.counts[filter] ?? 0) - ids.length) } });
+    setSelected(new Set());
     try {
-      if (action === 'progress') await api.post(`jobs/${job.id}/progress`, { reason: null });
-      else if (action === 'not_interested') await api.post(`jobs/${job.id}/verdict`, { verdict: 'bad', reason_tags: [], note: null });
-      else if (action === 'bring_back') await api.post(`jobs/${job.id}/verdict`, { verdict: 'maybe', reason_tags: [], note: null });
-      else if (action === 'not_available') await api.post(`jobs/${job.id}/close`, { reason: 'Not available on LinkedIn' });
-      else await api.post(`jobs/${job.id}/reopen`, {});
-      props.onNotice(NOTICE[action]);
+      const out = await api.post<{ done: number; failed: number[] }>('jobs/batch', { ids, action });
+      props.onNotice(`${out.done} ${out.done === 1 ? 'job' : 'jobs'} ${DONE[action]}.`);
+      if (out.failed.length > 0) {
+        setError(`${out.failed.length} could not change and are back in the list.`);
+        void load();
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The job did not update.');
+      setError(err instanceof ApiError ? err.message : 'The jobs did not update.');
       void load();
     }
+  };
+
+  const saveViews = (next: SavedView[]) => {
+    setViews(next);
+    api.post('views', { views: next }).catch(() => setError('The saved view did not save.'));
+  };
+
+  const saveCurrentView = () => {
+    const name = viewName.trim();
+    if (!name) return;
+    saveViews([...views.filter((v) => v.name !== name), { name, filter, q: query }]);
+    setViewName('');
+  };
+
+  const openView = (v: SavedView) => {
+    setFilter(v.filter as Filter);
+    setQuery(v.q);
   };
 
   const loadResults = () => {
@@ -204,11 +257,12 @@ export function Inbox(props: {
 
   const lastRefreshText = status?.completed_at ? clock(status.completed_at) : null;
   const counts: Partial<Record<Filter, number>> = data?.counts ?? {};
-  const filtersOn = filter !== 'undecided' || direct !== 'any';
+  const filtersOn = filter !== 'undecided' || direct !== 'any' || query !== '';
   const emptyText = `Nothing new since ${lastRefreshText ?? 'the first refresh'}.`;
   const clearFilters = () => {
     setFilter('undecided');
     setDirect('any');
+    setQuery('');
   };
 
   const progress = status?.progress;
@@ -325,6 +379,35 @@ export function Inbox(props: {
         </button>
       </div>
 
+      <div className="search-row">
+        <input type="search" className="search" value={query} placeholder="Search title, company, place, target, source" aria-label="Search jobs" onChange={(e) => setQuery(e.target.value)} />
+        <div className="saved-views" aria-label="Saved views">
+          {views.map((v) => (
+            <span key={v.name} className="tg dir view-chip">
+              <button type="button" onClick={() => openView(v)}>
+                {v.name}
+              </button>
+              <button type="button" aria-label={`Remove ${v.name}`} onClick={() => saveViews(views.filter((x) => x.name !== v.name))}>
+                ×
+              </button>
+            </span>
+          ))}
+          <input value={viewName} placeholder="Name this view" aria-label="Name this view" onChange={(e) => setViewName(e.target.value)} />
+          <button type="button" className="btn btn-dark" onClick={saveCurrentView} disabled={!viewName.trim()}>
+            Save view
+          </button>
+        </div>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="selbar" role="status">
+          <span className="mono">{selected.size} selected. A button on any selected row applies to all of them.</span>
+          <button type="button" className="linkish" onClick={() => setSelected(new Set())}>
+            Clear
+          </button>
+        </div>
+      )}
+
       {error && (
         <p className="alert" role="alert">
           {error}
@@ -336,7 +419,10 @@ export function Inbox(props: {
           jobs={visible}
           view={filter}
           sort={sort}
+          selected={selected}
           onSort={onSort}
+          onPick={pick}
+          onPickAll={pickAll}
           onOpen={openListing}
           onDecide={decide}
           small={small}

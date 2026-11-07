@@ -5,6 +5,7 @@ import type { WeightProfileView } from '../../shared/types.ts';
 
 const KEYS: Array<{ key: keyof WeightProfileView['weights']; label: string }> = [
   { key: 'tn', label: 'TN and visa fit' },
+  { key: 'target_role', label: 'Target company and role' },
   { key: 'role', label: 'Role and resume fit' },
   { key: 'direct', label: 'Direct line' },
   { key: 'recency', label: 'Recency' },
