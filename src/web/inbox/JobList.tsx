@@ -1,8 +1,39 @@
-import { useRef, type KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { JobListItem } from '../../shared/types.ts';
-import { arrangementWord, postedText, scoreAnnouncement } from '../format.ts';
+import { arrangementWord, postedText } from '../format.ts';
 
-// Desktop: a real table with scope headers. Phone: cards with the same fields in the same order.
+export type SortKey = 'posted' | 'company' | 'role' | 'where' | 'pay' | 'direct';
+export interface SortState {
+  key: SortKey;
+  dir: 'asc' | 'desc';
+}
+export const SORT_KEYS: SortKey[] = ['posted', 'company', 'role', 'where', 'pay', 'direct'];
+const SORT_LABEL: Record<SortKey, string> = { posted: 'Posted', company: 'Company', role: 'Role', where: 'Where', pay: 'Pay', direct: 'Direct line' };
+
+// Newest and highest pay first. Text columns start A to Z. Direct line starts with the strongest tier.
+export function defaultDir(key: SortKey): SortState['dir'] {
+  return key === 'posted' || key === 'pay' ? 'desc' : 'asc';
+}
+
+export function sortJobs(jobs: JobListItem[], sort: SortState): JobListItem[] {
+  const value = (job: JobListItem): string | number => {
+    if (sort.key === 'posted') return job.posted_at ? Date.parse(job.posted_at) : 0;
+    if (sort.key === 'company') return (job.company ?? '').toLowerCase();
+    if (sort.key === 'role') return job.title.toLowerCase();
+    if (sort.key === 'where') return (job.location ?? '').toLowerCase();
+    if (sort.key === 'pay') return job.pay?.max ?? -1;
+    return job.direct_tier === 0 ? 4 : job.direct_tier;
+  };
+  const sign = sort.dir === 'asc' ? 1 : -1;
+  return [...jobs].sort((a, b) => {
+    const x = value(a);
+    const y = value(b);
+    const diff = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
+    return sign * diff || a.id - b.id;
+  });
+}
+
+// Flags say what needs a look. They never hide a row.
 export function flagTags(job: JobListItem): Array<{ text: string; tone: string }> {
   const tags: Array<{ text: string; tone: string }> = [];
   if (job.rule_blocked) tags.push({ text: 'Blocked by rule', tone: 'red' });
@@ -29,18 +60,18 @@ export function directTag(job: JobListItem): { text: string; dir: boolean } {
 
 interface ListProps {
   jobs: JobListItem[];
-  selectedId: number | null;
-  onSelect: (id: number) => void;
-  onVerdict: (id: number, verdict: 'good' | 'maybe' | 'bad') => void;
-  onQuickProgress: (id: number) => void;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+  onOpen: (job: JobListItem) => void;
+  onToggleAvailable: (job: JobListItem) => void;
   small: boolean;
   emptyText: string;
-  collapsing: number | null;
 }
 
+// Desktop: a table with sortable headers. Phone: cards with the same fields and a sort picker.
+// The two row buttons sit on the row itself, so a job is opened or marked without a panel.
 export function JobList(props: ListProps) {
-  const { jobs, selectedId, onSelect, small, emptyText, collapsing } = props;
-  const tableRef = useRef<HTMLTableElement>(null);
+  const { jobs, sort, onSort, onOpen, onToggleAvailable, small, emptyText } = props;
 
   if (jobs.length === 0) {
     return <p className="empty">{emptyText}</p>;
@@ -58,120 +89,141 @@ export function JobList(props: ListProps) {
 
   if (small) {
     return (
-      <div className="cards" onKeyDown={moveFocus}>
-        {jobs.map((job) => (
-          <article key={job.id} className={`card${selectedId === job.id ? ' sel' : ''}${job.blocked || job.rule_blocked ? ' blk' : ''}${collapsing === job.id ? ' collapsing' : ''}`}>
-            <div className="card-top">
-              <div className={`score${job.blocked || job.rule_blocked ? ' blk' : ''}`} aria-label={scoreAnnouncement(job.score, job.confidence)}>
-                {job.score ?? '-'}
-              </div>
-              <div>
-                <button type="button" className="role-btn" data-row-button onClick={() => onSelect(job.id)}>
-                  <span className="role">{job.title}</span>
-                </button>
-                <p className="sub">
-                  {job.company ?? 'Company not stated'}
-                  {job.arrangement ? ` · ${arrangementWord(job.arrangement)}` : ''}
-                </p>
-              </div>
-            </div>
-            <dl className="card-fields">
-              <div>
-                <dt>Where</dt>
-                <dd>{job.location ?? 'Not stated'}</dd>
-              </div>
-              <div>
-                <dt>Posted</dt>
-                <dd>{postedText(job)}</dd>
-              </div>
-              <div>
-                <dt>Pay</dt>
-                <dd>{job.pay?.text ?? 'Not listed'}</dd>
-              </div>
-              <div>
-                <dt>Direct line</dt>
-                <dd>{directTag(job).text}</dd>
-              </div>
-            </dl>
-            <div className="tags">
-              {flagTags(job).map((t) => (
-                <span key={t.text} className={`tg ${t.tone}`}>
-                  {t.text}
-                </span>
+      <>
+        <div className="cards-head">
+          <label className="sort-pick">
+            Sort by
+            <select value={sort.key} onChange={(e) => onSort(e.target.value as SortKey)}>
+              {SORT_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABEL[key]}
+                </option>
               ))}
-            </div>
-            <VerdictRow job={job} onVerdict={props.onVerdict} />
-            <button type="button" className="act" onClick={() => props.onQuickProgress(job.id)} disabled={Boolean(job.blocked || job.rule_blocked)}>
-              {job.applied || job.in_analysis ? 'Progress (reason needed)' : 'Progress this job'}
-            </button>
-          </article>
-        ))}
-      </div>
+            </select>
+          </label>
+          <button type="button" className="pill" onClick={() => onSort(sort.key)}>
+            {sort.dir === 'asc' ? 'Ascending' : 'Descending'}
+          </button>
+        </div>
+        <div className="cards" onKeyDown={moveFocus}>
+          {jobs.map((job) => (
+            <article key={job.id} className={`card${job.blocked || job.rule_blocked ? ' blk' : ''}`}>
+              <div className="card-top">
+                <div>
+                  <span className="role">{job.title}</span>
+                  <p className="sub">
+                    {job.company ?? 'Company not stated'}
+                    {job.arrangement ? ` · ${arrangementWord(job.arrangement)}` : ''}
+                  </p>
+                </div>
+              </div>
+              <dl className="card-fields">
+                <div>
+                  <dt>Where</dt>
+                  <dd>{job.location ?? 'Not stated'}</dd>
+                </div>
+                <div>
+                  <dt>Posted</dt>
+                  <dd>{postedText(job)}</dd>
+                </div>
+                <div>
+                  <dt>Pay</dt>
+                  <dd>{job.pay?.text ?? 'Not listed'}</dd>
+                </div>
+                <div>
+                  <dt>Direct line</dt>
+                  <dd>{directTag(job).text}</dd>
+                </div>
+              </dl>
+              <div className="tags">
+                {flagTags(job).map((t) => (
+                  <span key={t.text} className={`tg ${t.tone}`}>
+                    {t.text}
+                  </span>
+                ))}
+              </div>
+              <RowActions job={job} onOpen={onOpen} onToggleAvailable={onToggleAvailable} />
+            </article>
+          ))}
+        </div>
+      </>
     );
   }
 
   return (
     <div className="list">
-      <table ref={tableRef} onKeyDown={moveFocus}>
+      <table onKeyDown={moveFocus}>
         <thead>
           <tr>
-            <th scope="col">Score</th>
-            <th scope="col">Role</th>
-            <th scope="col">Where</th>
-            <th scope="col">Posted</th>
-            <th scope="col">Pay</th>
-            <th scope="col">Direct line</th>
+            <SortHeader label="Posted" column="posted" sort={sort} onSort={onSort} />
+            <SortHeader label="Company" column="company" sort={sort} onSort={onSort} />
+            <SortHeader label="Role" column="role" sort={sort} onSort={onSort} />
+            <SortHeader label="Where" column="where" sort={sort} onSort={onSort} />
+            <SortHeader label="Pay" column="pay" sort={sort} onSort={onSort} />
+            <SortHeader label="Direct line" column="direct" sort={sort} onSort={onSort} />
             <th scope="col">Flags</th>
+            <th scope="col">Listing</th>
           </tr>
         </thead>
         <tbody>
-          {jobs.map((job) => {
-            const blocked = Boolean(job.blocked || job.rule_blocked);
-            return (
-              <tr key={job.id} className={`${selectedId === job.id ? 'sel' : ''}${blocked ? ' blk' : ''}${collapsing === job.id ? ' collapsing' : ''}`} onClick={() => onSelect(job.id)}>
-                <td data-label="Score" aria-label={scoreAnnouncement(job.score, job.confidence)}>
-                  <span className={`sc${blocked ? ' blk' : ''}`}>{job.score ?? '-'}</span>
-                </td>
-                <td data-label="Role">
-                  <button type="button" className="role-btn" data-row-button onClick={(e) => { e.stopPropagation(); onSelect(job.id); }}>
-                    <span className="role">{job.title}</span>
-                  </button>
-                  <p className="sub">{job.company ?? 'Company not stated'}</p>
-                </td>
-                <td data-label="Where">
-                  {job.location ?? 'Not stated'}
-                  <p className="sub">{arrangementWord(job.arrangement)}</p>
-                </td>
-                <td data-label="Posted">{postedText(job)}</td>
-                <td data-label="Pay">{job.pay?.text ?? 'Not listed'}</td>
-                <td data-label="Direct line">
-                  <span className={`tg${directTag(job).dir ? ' dir' : ''}`}>{directTag(job).text}</span>
-                </td>
-                <td data-label="Flags">
-                  {flagTags(job).map((t) => (
-                    <span key={t.text} className={`tg ${t.tone}`}>
-                      {t.text}
-                    </span>
-                  ))}
-                </td>
-              </tr>
-            );
-          })}
+          {jobs.map((job) => (
+            <tr key={job.id} className={job.blocked || job.rule_blocked ? 'blk' : undefined}>
+              <td data-label="Posted">{postedText(job)}</td>
+              <td data-label="Company">{job.company ?? 'Company not stated'}</td>
+              <td data-label="Role">
+                <span className="role">{job.title}</span>
+              </td>
+              <td data-label="Where">
+                {job.location ?? 'Not stated'}
+                <p className="sub">{arrangementWord(job.arrangement)}</p>
+              </td>
+              <td data-label="Pay">{job.pay?.text ?? 'Not listed'}</td>
+              <td data-label="Direct line">
+                <span className={`tg${directTag(job).dir ? ' dir' : ''}`}>{directTag(job).text}</span>
+              </td>
+              <td data-label="Flags">
+                {flagTags(job).map((t) => (
+                  <span key={t.text} className={`tg ${t.tone}`}>
+                    {t.text}
+                  </span>
+                ))}
+              </td>
+              <td data-label="Listing">
+                <RowActions job={job} onOpen={onOpen} onToggleAvailable={onToggleAvailable} />
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-function VerdictRow(props: { job: JobListItem; onVerdict: (id: number, v: 'good' | 'maybe' | 'bad') => void }) {
-  const { job, onVerdict } = props;
+function SortHeader(props: { label: string; column: SortKey; sort: SortState; onSort: (key: SortKey) => void }) {
+  const { label, column, sort, onSort } = props;
+  const active = sort.key === column;
   return (
-    <div className="fb" role="group" aria-label={`Verdict for ${job.title}`}>
-      {(['good', 'maybe', 'bad'] as const).map((v) => (
-        <button key={v} type="button" aria-pressed={job.verdict === v} onClick={() => onVerdict(job.id, v)}>
-          {v === 'good' ? 'Good' : v === 'maybe' ? 'Maybe' : 'Bad'}
+    <th scope="col" aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className="sort-btn" onClick={() => onSort(column)}>
+        {label}
+        {active && (sort.dir === 'asc' ? ' ▲' : ' ▼')}
+      </button>
+    </th>
+  );
+}
+
+function RowActions(props: { job: JobListItem; onOpen: (job: JobListItem) => void; onToggleAvailable: (job: JobListItem) => void }) {
+  const { job, onOpen, onToggleAvailable } = props;
+  return (
+    <div className="row-actions">
+      <button type="button" className="btn" data-row-button onClick={() => onOpen(job)}>
+        Open listing
+      </button>
+      {!(job.blocked || job.rule_blocked) && (
+        <button type="button" className="btn btn-dark" data-row-button onClick={() => onToggleAvailable(job)}>
+          {job.closed ? 'Reopen' : 'Not available'}
         </button>
-      ))}
+      )}
     </div>
   );
 }

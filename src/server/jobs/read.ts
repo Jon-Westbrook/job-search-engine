@@ -125,6 +125,7 @@ function toItem(db: Db, row: JobRow): JobListItem {
   return {
     id: row.id,
     title: row.title,
+    url: row.canonical_url,
     company: row.company,
     location: row.location,
     arrangement: row.arrangement,

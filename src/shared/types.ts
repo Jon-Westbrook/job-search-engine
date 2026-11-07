@@ -18,6 +18,7 @@ export interface PayInfo {
 export interface JobListItem {
   id: number;
   title: string;
+  url: string;
   company: string | null;
   location: string | null;
   arrangement: string | null;

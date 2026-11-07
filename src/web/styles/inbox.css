@@ -342,7 +342,7 @@ th:last-child {
 }
 
 td {
-  padding: 18px 14px;
+  padding: 10px 12px;
   border-bottom: var(--border);
   border-right: var(--border);
   vertical-align: middle;
@@ -353,7 +353,6 @@ td:last-child {
 }
 
 tbody tr {
-  cursor: pointer;
   transition: background-color 150ms;
 }
 
@@ -754,6 +753,45 @@ tbody tr.sel .tg.dir {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+.list .row-actions {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.list .btn {
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 13px;
+  box-shadow: 3px 3px 0 var(--cream);
+}
+
+.sort-btn {
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cards-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.sort-pick {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font: 600 13px/1.3 var(--font-mono);
+  text-transform: uppercase;
 }
 
 .field-label {
