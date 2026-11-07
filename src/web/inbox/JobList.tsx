@@ -234,6 +234,12 @@ interface RowProps {
   onDecide: (job: JobListItem, action: Decide) => void;
 }
 
+// Not available sits right after Open listing, whichever view the row is in.
+function orderedActions(view: Filter): Decide[] {
+  const actions = VIEW_ACTIONS[view] ?? [];
+  return [...actions.filter((a) => a === 'not_available'), ...actions.filter((a) => a !== 'not_available')];
+}
+
 function RowActions(props: RowProps) {
   const { job, view, selected, onOpen, onDecide } = props;
   const blocked = Boolean(job.blocked || job.rule_blocked);
@@ -244,7 +250,7 @@ function RowActions(props: RowProps) {
         Open listing
       </button>
       {!blocked &&
-        (VIEW_ACTIONS[view] ?? []).map((action) => (
+        orderedActions(view).map((action) => (
           <button key={action} type="button" className={action === 'progress' || action === 'applied' ? 'btn' : 'btn btn-dark'} data-row-button onClick={() => onDecide(job, action)}>
             {DECIDE_LABEL[action]}
             {many ? ` ${selected.size}` : ''}

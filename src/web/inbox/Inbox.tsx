@@ -60,7 +60,6 @@ export function Inbox(props: {
   const [stats, setStats] = useState<Stats | null>(null);
   const [results, setResults] = useState<ResultsResponse | null>(null);
   const [views, setViews] = useState<SavedView[]>([]);
-  const [viewName, setViewName] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [shown, setShown] = useState(CHUNK);
   const [error, setError] = useState<string | null>(null);
@@ -236,11 +235,10 @@ export function Inbox(props: {
     api.post('views', { views: next }).catch(() => setError('The saved view did not save.'));
   };
 
+  // A saved view is named after its search text, or after its filter when there is no search.
   const saveCurrentView = () => {
-    const name = viewName.trim();
-    if (!name) return;
+    const name = query.trim() || FILTERS.find((f) => f.key === filter)?.label || 'View';
     saveViews([...views.filter((v) => v.name !== name), { name, filter, q: query }]);
-    setViewName('');
   };
 
   const openView = (v: SavedView) => {
@@ -377,11 +375,16 @@ export function Inbox(props: {
         <button type="button" className="pill" onClick={props.onOpenWeights}>
           Scoring settings
         </button>
+        <label className="search">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M15.5 15.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input type="search" value={query} placeholder="Search" aria-label="Search jobs" onChange={(e) => setQuery(e.target.value)} />
+        </label>
       </div>
 
-      <div className="search-row">
-        <input type="search" className="search" value={query} placeholder="Search title, company, place, target, source" aria-label="Search jobs" onChange={(e) => setQuery(e.target.value)} />
-        <div className="saved-views" aria-label="Saved views">
+      <div className="saved-views" aria-label="Saved views">
           {views.map((v) => (
             <span key={v.name} className="tg dir view-chip">
               <button type="button" onClick={() => openView(v)}>
@@ -392,12 +395,10 @@ export function Inbox(props: {
               </button>
             </span>
           ))}
-          <input value={viewName} placeholder="Name this view" aria-label="Name this view" onChange={(e) => setViewName(e.target.value)} />
-          <button type="button" className="btn btn-dark" onClick={saveCurrentView} disabled={!viewName.trim()}>
-            Save view
+          <button type="button" className="pill" onClick={saveCurrentView}>
+            Save this view
           </button>
         </div>
-      </div>
 
       {selected.size > 0 && (
         <div className="selbar" role="status">
