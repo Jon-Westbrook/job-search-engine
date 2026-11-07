@@ -5,6 +5,8 @@ import { GOOD_FIT_THRESHOLD, REVIEW_THRESHOLD } from '../../shared/app.ts';
 import { earliestAlertAt } from './posted.ts';
 import { askedFor } from '../outreach.ts';
 import type { Band, Confidence, Filter, JobListItem, Verdict } from '../../shared/types.ts';
+import { SOURCE_CHANNEL_KEYS, isSourceChannel, type SourceChannel } from '../../shared/channels.ts';
+import { decisionOf } from '../../shared/decision.ts';
 
 export type { Band, Filter, JobListItem };
 
@@ -115,7 +117,30 @@ function askedText(db: Db, jobId: number): string | null {
   return names.length === 1 ? `Asked ${names[0]}` : `Asked ${names.length} people`;
 }
 
-function toItem(db: Db, row: JobRow): JobListItem {
+// The channels each job came from, read in one query. A job lists its channels in SOURCE_CHANNELS order.
+export function channelMap(db: Db): Map<number, SourceChannel[]> {
+  const rows = db
+    .prepare(
+      `SELECT js.job_id AS job_id, sp.provider AS provider FROM job_sources js
+       JOIN source_postings sp ON sp.id = js.posting_id WHERE js.split_at IS NULL`,
+    )
+    .all() as Array<{ job_id: number; provider: string }>;
+  const map = new Map<number, SourceChannel[]>();
+  for (const row of rows) {
+    if (!isSourceChannel(row.provider)) continue;
+    const list = map.get(row.job_id) ?? [];
+    if (!list.includes(row.provider)) list.push(row.provider);
+    map.set(row.job_id, list.sort((a, b) => SOURCE_CHANNEL_KEYS.indexOf(a) - SOURCE_CHANNEL_KEYS.indexOf(b)));
+  }
+  return map;
+}
+
+export function loadItems(db: Db): JobListItem[] {
+  const channels = channelMap(db);
+  return loadJobRows(db).map((row) => toItem(db, row, channels.get(row.id) ?? []));
+}
+
+function toItem(db: Db, row: JobRow, channels: SourceChannel[]): JobListItem {
   const flags = parseList(row.flags);
   const missing = parseList(row.missing);
   const match: ApplicationMatch | null = findApplicationMatch(db, { id: row.id, canonical_url: row.canonical_url, company_key: row.company_key, title_key: row.title_key });
@@ -129,6 +154,7 @@ function toItem(db: Db, row: JobRow): JobListItem {
     company: row.company,
     location: row.location,
     arrangement: row.arrangement,
+    channels,
     posted_at: estimatedAt ?? row.posted_at,
     posted_estimated: !row.posted_at && estimatedAt !== null,
     pay: payText(row),
@@ -175,27 +201,32 @@ export interface ListOptions {
 }
 
 export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; counts: Record<Filter, number> } {
-  const all = loadJobRows(db).map((row) => toItem(db, row));
+  const all = loadItems(db);
   // Open means not blocked, not rule-blocked, and not closed on LinkedIn.
   const open = (j: JobListItem) => !j.blocked && !j.rule_blocked && !j.closed;
-  const closedOnly = (j: JobListItem) => Boolean(j.closed) && !j.blocked && !j.rule_blocked;
+  // The queue is the jobs with no decision yet. Progressing, not available, and not interested all leave it.
+  const queued = (j: JobListItem) => open(j) && decisionOf(j) === 'undecided';
   const counts: Record<Filter, number> = {
     all: all.filter(open).length,
-    good: all.filter((j) => open(j) && j.band === 'good').length,
-    review: all.filter((j) => open(j) && j.band === 'review').length,
+    undecided: all.filter(queued).length,
+    good: all.filter((j) => queued(j) && j.band === 'good').length,
+    review: all.filter((j) => queued(j) && j.band === 'review').length,
+    progressed: all.filter((j) => decisionOf(j) === 'progressed').length,
+    not_interested: all.filter((j) => decisionOf(j) === 'not_interested').length,
+    not_available: all.filter((j) => decisionOf(j) === 'not_available').length,
     blocked: all.filter((j) => j.band === 'blocked').length,
-    applied: all.filter((j) => open(j) && Boolean(j.applied)).length,
-    closed: all.filter(closedOnly).length,
     targets: all.filter((j) => open(j) && Boolean(j.target)).length,
   };
   let items = all.filter((j) => {
     if (opts.filter === 'all') return open(j);
-    if (opts.filter === 'good') return open(j) && j.band === 'good';
-    if (opts.filter === 'review') return open(j) && j.band === 'review';
-    if (opts.filter === 'blocked') return j.band === 'blocked';
-    if (opts.filter === 'closed') return closedOnly(j);
+    if (opts.filter === 'undecided') return queued(j);
+    if (opts.filter === 'good') return queued(j) && j.band === 'good';
+    if (opts.filter === 'review') return queued(j) && j.band === 'review';
+    if (opts.filter === 'progressed') return decisionOf(j) === 'progressed';
+    if (opts.filter === 'not_interested') return decisionOf(j) === 'not_interested';
+    if (opts.filter === 'not_available') return decisionOf(j) === 'not_available';
     if (opts.filter === 'targets') return open(j) && Boolean(j.target);
-    return open(j) && Boolean(j.applied);
+    return j.band === 'blocked';
   });
   if (opts.direct === 'tier1') items = items.filter((j) => j.direct_tier === 1);
   if (opts.direct === 'tier2plus') items = items.filter((j) => j.direct_tier >= 1 && j.direct_tier <= 2);
@@ -217,7 +248,7 @@ function sorter(sort: ListOptions['sort']): (a: JobListItem, b: JobListItem) => 
 export function jobDetail(db: Db, jobId: number): Record<string, unknown> | null {
   const row = loadJobRows(db).find((r) => r.id === jobId);
   if (!row) return null;
-  const item = toItem(db, row);
+  const item = toItem(db, row, channelMap(db).get(jobId) ?? []);
   const runId = row.run_id;
   const factors = runId
     ? (db.prepare(`SELECT factor, ai_value, points, max, evidence_excerpt, source_field, confidence FROM score_factors
@@ -271,7 +302,7 @@ function safeJson(raw: string): unknown {
 export function stats(db: Db, lastRefreshAt: string | null): { new_since_refresh: number; good_fit: number; applied: number } {
   const { items } = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' });
   const all = items;
-  const every = loadJobRows(db).map((row) => toItem(db, row));
+  const every = loadItems(db);
   const newSince = lastRefreshAt ? every.filter((j) => j.first_seen > lastRefreshAt && !j.blocked && !j.rule_blocked).length : all.length;
   return {
     new_since_refresh: newSince,

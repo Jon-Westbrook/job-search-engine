@@ -27,14 +27,15 @@ function progressed(db: Db, jobId: number, status: 'saved' | 'applied') {
   return createApplication(db, { company: job.company, title: job.title, status }, 'progress', { jobId, nowIso: NOW });
 }
 
-test('a progressed job is In Analysis, not Applied, and is left out of the Applied filter and count', () => {
+test('a progressed job is In Analysis, not Applied, and sits under Progressed', () => {
   const { db, jobId } = oneJob();
   progressed(db, jobId, 'saved');
   const item = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).items[0]!;
   assert.equal(item.applied, null);
   assert.ok(item.in_analysis);
-  assert.equal(listJobs(db, { filter: 'applied', direct: 'any', sort: 'score' }).items.length, 0);
-  assert.equal(listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).counts.applied, 0);
+  assert.equal(listJobs(db, { filter: 'progressed', direct: 'any', sort: 'score' }).items.length, 1);
+  assert.equal(listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).counts.progressed, 1);
+  assert.equal(listJobs(db, { filter: 'undecided', direct: 'any', sort: 'score' }).items.length, 0);
   db.close();
 });
 
@@ -42,7 +43,7 @@ test('an application past Saved counts as Applied and keeps its date', () => {
   const { db, jobId } = oneJob();
   const appId = progressed(db, jobId, 'saved');
   updateApplicationStatus(db, appId, 'applied', null, LATER);
-  const item = listJobs(db, { filter: 'applied', direct: 'any', sort: 'score' }).items[0]!;
+  const item = listJobs(db, { filter: 'progressed', direct: 'any', sort: 'score' }).items[0]!;
   assert.ok(item.applied);
   assert.equal(item.in_analysis, null);
   assert.equal(item.applied.date, LATER, 'date recorded on first applied status');

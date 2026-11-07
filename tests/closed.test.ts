@@ -33,8 +33,8 @@ test('a closed job leaves All and shows under Closed, with its history kept', ()
   closeJob(db, jobId, '', NOW);
   const after = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' });
   assert.equal(after.items.length, 0);
-  assert.equal(after.counts.closed, 1);
-  const closed = listJobs(db, { filter: 'closed', direct: 'any', sort: 'score' });
+  assert.equal(after.counts.not_available, 1);
+  const closed = listJobs(db, { filter: 'not_available', direct: 'any', sort: 'score' });
   assert.equal(closed.items.length, 1);
   assert.match(closed.items[0]?.closed?.reason ?? '', /No longer accepting/);
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM job_events WHERE job_id = ? AND type = 'closed'").get(jobId) as { n: number }).n, 1);

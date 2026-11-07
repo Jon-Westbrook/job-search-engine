@@ -3,7 +3,8 @@ import type { Db } from '../db/index.ts';
 import type { Logger } from '../log.ts';
 import { HttpError, type Router, type RouteHandler, sendJson } from '../http/router.ts';
 import { ActionError, blockJob, closeJob, mergeJobs, openListing, reopenJob, overrideBlock, setDescription, setVerdict, splitPosting, undoBlock } from '../jobs/actions.ts';
-import { jobDetail, listJobs, stats, type Filter } from '../jobs/read.ts';
+import { jobDetail, listJobs, loadItems, stats, type Filter } from '../jobs/read.ts';
+import { decisionResults } from '../jobs/results.ts';
 import { ProgressBlocked, progressJob, createApplication, updateApplicationStatus, APPLICATION_STATUSES, type ApplicationStatus } from '../applications.ts';
 import { ContactError, createContact } from '../contacts.ts';
 import { buildNetwork } from '../network.ts';
@@ -51,7 +52,7 @@ function jobId(params: Record<string, string>): number {
   return id;
 }
 
-const FILTERS: Filter[] = ['all', 'good', 'review', 'blocked', 'applied', 'closed', 'targets'];
+const FILTERS: Filter[] = ['all', 'undecided', 'good', 'review', 'progressed', 'not_interested', 'not_available', 'blocked', 'targets'];
 const SORTS = ['score', 'age', 'pay', 'confidence', 'targets'] as const;
 
 export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
@@ -70,6 +71,12 @@ export function registerJobRoutes(router: Router, deps: JobsApiDeps): void {
 
   router.get('/stats', ({ res }) => {
     sendJson(res, 200, stats(db, deps.lastRefreshAt()));
+  });
+
+  // Loaded only when the Results section is opened, since it reads every job.
+  router.get('/results', ({ res }) => {
+    const opened = new Set((db.prepare(`SELECT DISTINCT job_id FROM job_events WHERE type = 'listing_opened'`).all() as Array<{ job_id: number }>).map((r) => r.job_id));
+    sendJson(res, 200, decisionResults(loadItems(db), opened));
   });
 
   router.get('/jobs/:id', ({ res, params }) => {

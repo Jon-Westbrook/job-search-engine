@@ -794,6 +794,30 @@ tbody tr.sel .tg.dir {
   text-transform: uppercase;
 }
 
+.more-row {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.results {
+  margin: 24px 0;
+}
+
+.results summary {
+  font: 600 13px/1.3 var(--font-mono);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.results .list {
+  margin-top: 12px;
+}
+
+.results table {
+  min-width: 0;
+}
+
 .field-label {
   font: 600 13px/1.3 var(--font-mono);
   text-transform: uppercase;

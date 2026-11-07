@@ -91,11 +91,11 @@ export class RefreshService {
     return this.execute();
   }
 
-  // Scores new and changed jobs when a per-refresh limit is set. Uses AI when the Codex sign-in
-  // works and rules-only mode is not forced. A provider failure pauses scoring and keeps the last good scores.
+  // Scores new and changed jobs. Uses AI when the Codex sign-in works and rules-only mode
+  // is not forced. A provider failure pauses scoring and keeps the last good scores.
   private async scoreAfterIngest(): Promise<void> {
     const scoring = this.deps.scoring;
-    if (!scoring || !this.deps.scoreLimit) return;
+    if (!scoring) return;
     const aiAvailable = this.deps.rulesOnly ? false : (await scoring.codex.status()).available;
     const res = await scoreNeeded(scoring, aiAvailable, this.deps.scoreLimit, (done, total) => {
       this.progress = { phase: 'scoring', done, total, messages: 0 };

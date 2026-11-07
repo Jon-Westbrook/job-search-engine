@@ -75,11 +75,11 @@ export function normalizeBasePath(raw: string): string {
   return trimmed ? `/${trimmed}` : '';
 }
 
-// Scoring is off by default. A positive SCORE_MAX_PER_REFRESH turns it on, capped per refresh
-// so a daily refresh cannot make hundreds of AI calls. Newest jobs are scored first.
+// AI scoring is capped per refresh so a daily refresh cannot make hundreds of calls.
+// Newest jobs are scored first. The rest wait for later refreshes.
 function parseLimit(raw: string | undefined): number {
-  const n = Number(raw ?? 0);
-  return Number.isInteger(n) && n >= 0 ? n : 0;
+  const n = Number(raw ?? 50);
+  return Number.isInteger(n) && n >= 1 ? n : 50;
 }
 
 function parseLogLevel(raw: string | undefined): Config['logLevel'] {

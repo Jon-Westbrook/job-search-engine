@@ -1,7 +1,9 @@
 // API types shared by the server and the web app. Keep these in step with the routes.
 
+import type { SourceChannel } from './channels.ts';
+
 export type Band = 'good' | 'review' | 'low' | 'blocked' | 'unscored';
-export type Filter = 'all' | 'good' | 'review' | 'blocked' | 'applied' | 'closed' | 'targets';
+export type Filter = 'all' | 'undecided' | 'good' | 'review' | 'progressed' | 'not_interested' | 'not_available' | 'blocked' | 'targets';
 export type Verdict = 'good' | 'maybe' | 'bad';
 export type Confidence = 'high' | 'medium' | 'low';
 export type DirectFilter = 'any' | 'tier1' | 'tier2plus';
@@ -22,6 +24,7 @@ export interface JobListItem {
   company: string | null;
   location: string | null;
   arrangement: string | null;
+  channels: SourceChannel[];
   posted_at: string | null;
   posted_estimated: boolean;
   pay: PayInfo | null;
@@ -52,6 +55,22 @@ export interface JobListItem {
 export interface JobsResponse {
   items: JobListItem[];
   counts: Record<Filter, number>;
+}
+
+// What the owner did with the jobs in each channel and score band. Each job counts once.
+export interface ResultRow {
+  key: string;
+  label: string;
+  undecided: number;
+  progressed: number;
+  not_interested: number;
+  not_available: number;
+  opened: number;
+}
+
+export interface ResultsResponse {
+  by_channel: ResultRow[];
+  by_band: ResultRow[];
 }
 
 export interface FactorRow {
