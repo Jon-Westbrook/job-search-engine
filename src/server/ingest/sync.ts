@@ -191,7 +191,8 @@ function handleMessage(
     addError({ message_id: message.id, error: err.replace(`${message.id}: `, '') });
   }
   for (const posting of parsed.postings) {
-    if (postedTooOld(posting.postedAt, nowIso)) continue;
+    // LinkedIn alerts rarely state a date, so the day the alert arrived is the age that counts.
+    if (postedTooOld(posting.postedAt ?? posting.alertReceivedAt, nowIso)) continue;
     counts.postings++;
     const { outcome, postingId } = upsertPosting(db, posting, nowIso, source.parser_version);
     reopenIfRelisted(db, postingId, posting.alertReceivedAt, nowIso);
