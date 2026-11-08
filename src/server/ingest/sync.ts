@@ -5,6 +5,7 @@ import type { GogRunner } from '../gog/wrapper.ts';
 import { parseLinkedInAlert } from './linkedin.ts';
 import { getCursor, setCursor, upsertPosting } from './store.ts';
 import { reopenIfRelisted } from '../jobs/actions.ts';
+import { postedTooOld } from '../../shared/app.ts';
 
 const DAY_MS = 86_400_000;
 const MAX_PAGES = 50;
@@ -190,6 +191,7 @@ function handleMessage(
     addError({ message_id: message.id, error: err.replace(`${message.id}: `, '') });
   }
   for (const posting of parsed.postings) {
+    if (postedTooOld(posting.postedAt, nowIso)) continue;
     counts.postings++;
     const { outcome, postingId } = upsertPosting(db, posting, nowIso, source.parser_version);
     reopenIfRelisted(db, postingId, posting.alertReceivedAt, nowIso);

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import { validateViews } from '../src/server/saved-views.ts';
+import { postedTooOld } from '../src/shared/app.ts';
 import assert from 'node:assert/strict';
 import { decisionOf } from '../src/shared/decision.ts';
 import { SOURCE_CHANNELS, SOURCE_CHANNEL_KEYS, isSourceChannel } from '../src/shared/channels.ts';
@@ -55,4 +56,11 @@ test('saved views keep a name, a filter, and short search text, and refuse the r
   assert.deepEqual(validateViews([{ name: ' Omnicom ', filter: 'targets', q: 'omnicom' }]), [{ name: 'Omnicom', filter: 'targets', q: 'omnicom' }]);
   assert.throws(() => validateViews([{ name: '', filter: 'targets', q: '' }]));
   assert.throws(() => validateViews('nope'));
+});
+
+test('a posting with a stated date older than seven days is not stored, and an undated one is', () => {
+  const now = '2026-11-08T00:00:00.000Z';
+  assert.equal(postedTooOld('2026-10-20', now), true);
+  assert.equal(postedTooOld('2026-11-05', now), false);
+  assert.equal(postedTooOld(null, now), false);
 });

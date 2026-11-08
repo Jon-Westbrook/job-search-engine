@@ -4,6 +4,7 @@ import type { Logger } from '../log.ts';
 import { htmlToText } from '../gog/gmail.ts';
 import { guardedFetch } from '../net/guard.ts';
 import { descriptionFingerprint } from '../jobs/actions.ts';
+import { postedTooOld } from '../../shared/app.ts';
 import type { ParsedPosting } from './linkedin.ts';
 import { upsertPosting, type UpsertOutcome } from './store.ts';
 
@@ -357,6 +358,7 @@ export async function runFeeds(
       const fetched = await fetchFeed({ db, accepted, nowIso, fetcher, sleep, feed });
       summary.seen += fetched.seen;
       for (const job of fetched.jobs) {
+        if (postedTooOld(job.posting.postedAt, nowIso)) continue;
         const { outcome, postingId } = upsertPosting(db, job.posting, nowIso, `${feed.provider}-v1`);
         summary[outcome as UpsertOutcome] += 1;
         summary.kept += 1;

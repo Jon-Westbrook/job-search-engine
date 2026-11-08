@@ -9,7 +9,7 @@ import { groupNewPostings } from '../src/server/grouping.ts';
 import { closeJob } from '../src/server/jobs/actions.ts';
 import { listJobs } from '../src/server/jobs/read.ts';
 
-const NOW = '2026-10-28T20:00:00.000Z';
+const NOW = '2026-10-24T20:00:00.000Z';
 const NYC = ['new york', 'brooklyn', 'nyc', 'greater new york city area'];
 const body = JSON.parse(readFileSync(join(process.cwd(), 'fixtures/feeds/greenhouse-sample.json'), 'utf8')) as unknown;
 const VML: FeedConfig = { id: 'greenhouse-vml', provider: 'greenhouse', board: 'example', label: 'VML', enabled: true };
