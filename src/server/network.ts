@@ -1,5 +1,6 @@
 import type { Db } from './db/index.ts';
 import { listJobs } from './jobs/read.ts';
+import { decisionOf } from '../shared/decision.ts';
 import type { NetworkContact, NetworkJob, NetworkRow, OutreachRecord } from '../shared/types.ts';
 import { personKey } from '../shared/person.ts';
 import { listOutreach } from './outreach.ts';
@@ -33,7 +34,8 @@ export function buildNetwork(db: Db, nowIso: string = new Date().toISOString()):
   const jobUrls = new Map((db.prepare('SELECT id, canonical_url FROM jobs').all() as Array<{ id: number; canonical_url: string }>).map((r) => [r.id, r.canonical_url]));
   const targets = new Map((db.prepare('SELECT company_key, name FROM targets').all() as Array<{ company_key: string; name: string }>).map((r) => [r.company_key, r.name]));
   // Open jobs only: not blocked, not rule-blocked, not closed on LinkedIn.
-  const openJobs = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).items;
+  // Jobs you marked Not interested are left out. Not available jobs are already left out by the open filter.
+  const openJobs = listJobs(db, { filter: 'all', direct: 'any', sort: 'score' }).items.filter((j) => decisionOf(j) !== 'not_interested');
   const outreach = listOutreach(db, nowIso);
 
   const byKey = new Map<string, { company: string; contacts: NetworkContact[] }>();
