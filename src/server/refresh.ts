@@ -131,8 +131,10 @@ export class RefreshService {
         this.lastResult = result;
       }
       // Public company feeds run after the Gmail source. Their postings join the same grouping.
-      this.progress = { phase: 'downloading', done: 0, total: this.deps.feeds?.length ?? 0, messages: 0 };
-      const feedRun = await runFeeds(this.deps.db, this.deps.feeds ?? [], this.deps.acceptedGeography ?? [], this.deps.logger, new Date().toISOString());
+      this.progress = { phase: 'sources', done: 0, total: this.deps.feeds?.length ?? 0, messages: 0 };
+      const feedRun = await runFeeds(this.deps.db, this.deps.feeds ?? [], this.deps.acceptedGeography ?? [], this.deps.logger, new Date().toISOString(), undefined, undefined, (done, total) => {
+        this.progress = { phase: 'sources', done, total, messages: 0 };
+      });
       this.lastFeeds = feedRun.summary;
       this.progress = { phase: 'processing', done: 0, total: 0, messages: 0 };
       groupNewPostings(this.deps.db, this.deps.aliases, new Date().toISOString());

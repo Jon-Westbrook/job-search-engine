@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-type Phase = 'searching' | 'downloading' | 'processing' | 'scoring';
+type Phase = 'searching' | 'downloading' | 'sources' | 'processing' | 'scoring';
 
 const STEPS: Array<{ key: 'download' | 'process' | 'score'; label: string; phases: Phase[] }> = [
-  { key: 'download', label: 'Download alerts from Gmail', phases: ['searching', 'downloading'] },
+  { key: 'download', label: 'Download alerts from Gmail', phases: ['searching', 'downloading', 'sources'] },
   { key: 'process', label: 'Sort postings into jobs', phases: ['processing'] },
   { key: 'score', label: 'Score new and changed jobs', phases: ['scoring'] },
 ];
@@ -31,12 +31,13 @@ export function RefreshDialog(props: RefreshDialogProps) {
 
   const phase: Phase = progress?.phase ?? 'searching';
   const activeIndex = STEPS.findIndex((s) => s.phases.includes(phase));
-  const hasTotal = progress !== null && progress.total > 0 && (phase === 'downloading' || phase === 'scoring');
+  const hasTotal = progress !== null && progress.total > 0 && (phase === 'downloading' || phase === 'sources' || phase === 'scoring');
   const pct = hasTotal && progress ? Math.round((progress.done / progress.total) * 100) : null;
 
   let detail = 'Starting the refresh.';
   if (phase === 'searching') detail = 'Searching Gmail for new job alerts.';
   if (phase === 'downloading' && progress) detail = `${progress.done} of ${progress.total} alert threads downloaded. ${progress.messages} messages read.`;
+  if (phase === 'sources' && progress) detail = `${progress.done} of ${progress.total} company job boards read.`;
   if (phase === 'processing') detail = 'Sorting the new postings into jobs and matching duplicates.';
   if (phase === 'scoring' && progress) detail = `Scored ${progress.done} of ${progress.total} jobs.`;
 

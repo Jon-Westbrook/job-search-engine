@@ -52,7 +52,7 @@ export interface SyncProgress {
   messages: number;
 }
 
-export type RefreshPhase = 'searching' | 'downloading' | 'processing' | 'scoring';
+export type RefreshPhase = 'searching' | 'downloading' | 'sources' | 'processing' | 'scoring';
 
 export interface SyncDeps {
   db: Db;

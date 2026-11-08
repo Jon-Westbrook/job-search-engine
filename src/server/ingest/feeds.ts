@@ -338,10 +338,13 @@ export async function runFeeds(
   fetcher: Fetcher = (url) =>
     guardedFetch(url, { headers: { accept: '*/*', 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
   sleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  onFeed?: (done: number, total: number) => void,
 ): Promise<FeedRun> {
   const summary: FeedRunSummary = { feeds: 0, seen: 0, kept: 0, inserted: 0, updated: 0, unchanged: 0, cached: 0, errors: [] };
   const attachments: FeedRun['attachments'] = [];
-  for (const feed of feeds.filter((f) => f.enabled)) {
+  const enabled = feeds.filter((f) => f.enabled);
+  for (const [index, feed] of enabled.entries()) {
+    onFeed?.(index, enabled.length);
     summary.feeds += 1;
     if (feed.cache_hours && feed.cache_hours > 0) {
       const last = db.prepare('SELECT value FROM app_meta WHERE key = ?').get(`feed_fetched:${feed.id}`) as { value: string } | undefined;
