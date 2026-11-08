@@ -215,7 +215,7 @@ export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; cou
     not_interested: all.filter((j) => decisionOf(j) === 'not_interested').length,
     not_available: all.filter((j) => decisionOf(j) === 'not_available').length,
     blocked: all.filter((j) => j.band === 'blocked').length,
-    targets: all.filter((j) => open(j) && Boolean(j.target)).length,
+    targets: all.filter((j) => queued(j) && Boolean(j.target)).length,
   };
   let items = all.filter((j) => {
     if (opts.filter === 'all') return open(j);
@@ -225,7 +225,7 @@ export function listJobs(db: Db, opts: ListOptions): { items: JobListItem[]; cou
     if (opts.filter === 'progressed') return decisionOf(j) === 'progressed';
     if (opts.filter === 'not_interested') return decisionOf(j) === 'not_interested';
     if (opts.filter === 'not_available') return decisionOf(j) === 'not_available';
-    if (opts.filter === 'targets') return open(j) && Boolean(j.target);
+    if (opts.filter === 'targets') return queued(j) && Boolean(j.target);
     return j.band === 'blocked';
   });
   if (opts.direct === 'tier1') items = items.filter((j) => j.direct_tier === 1);
