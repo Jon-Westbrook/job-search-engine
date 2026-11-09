@@ -8,9 +8,9 @@ import { useSmallScreen } from '../hooks.ts';
 import { RowActions, type Decide } from '../inbox/RowActions.tsx';
 import { DONE, openListing, sendDecision } from '../inbox/useJobDecisions.ts';
 
-// Everyone you know, grouped by company, with the open jobs there ranked by score. For a company,
-// pick the person and the role, and the draft includes the listing link. Copy it, or copy and open
-// the person on LinkedIn, then mark it sent. You send it yourself; the app never sends a message.
+// Everyone you know, grouped by company, with the open jobs there ranked by score. Pick a person from
+// the list and a role, and the draft is always open. Copy and open LinkedIn, then mark it sent. You
+// send it yourself; the app never sends a message.
 
 const RELATIONSHIP: Record<string, string> = {
   friend: 'Friend',
@@ -26,11 +26,11 @@ interface Props {
   onNotice: (message: string) => void;
 }
 
-interface Writing {
-  company: string;
+// What the draft for a company currently says: who it goes to, which role, and any text you edited.
+interface Pick {
   personIndex: number;
   jobId: number | null;
-  text: string;
+  text?: string;
 }
 
 export function Network({ onNotice }: Props) {
@@ -38,7 +38,7 @@ export function Network({ onNotice }: Props) {
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
   const [me, setMe] = useState<OwnerMessage>({});
   const [error, setError] = useState<string | null>(null);
-  const [writing, setWriting] = useState<Writing | null>(null);
+  const [picks, setPicks] = useState<Record<string, Pick>>({});
 
   function load() {
     return api
@@ -66,15 +66,13 @@ export function Network({ onNotice }: Props) {
     void load();
   }
 
-  function start(row: NetworkRow) {
-    if (writing?.company === row.company) return setWriting(null);
-    const job = row.jobs[0] ?? null;
-    setWriting({ company: row.company, personIndex: 0, jobId: job?.id ?? null, text: messageFor(row, 0, job, me) });
+  // The first person and the first job are the default, so the draft is open straight away.
+  function pickFor(row: NetworkRow): Pick {
+    return picks[row.company] ?? { personIndex: 0, jobId: row.jobs[0]?.id ?? null };
   }
 
-  function change(row: NetworkRow, personIndex: number, jobId: number | null) {
-    const job = row.jobs.find((j) => j.id === jobId) ?? null;
-    setWriting({ company: row.company, personIndex, jobId, text: messageFor(row, personIndex, job, me) });
+  function choose(row: NetworkRow, next: Pick) {
+    setPicks((p) => ({ ...p, [row.company]: next }));
   }
 
   async function copy(text: string, then?: () => void) {
@@ -106,9 +104,11 @@ export function Network({ onNotice }: Props) {
       {rows.length === 0 && <p className="empty">No contacts yet. Add them to config/contacts.local.json.</p>}
       <ul className="network-list">
         {rows.map((row) => {
-          const open = writing?.company === row.company ? writing : null;
-          const person = open ? row.contacts[open.personIndex] ?? null : null;
-          const existing = open && person ? findRecord(row, person.key, open.jobId) : null;
+          const pick = pickFor(row);
+          const person = row.contacts[pick.personIndex] ?? null;
+          const job = row.jobs.find((j) => j.id === pick.jobId) ?? null;
+          const text = pick.text ?? (person ? messageFor(row, pick.personIndex, job, me) : '');
+          const existing = person ? findRecord(row, person.key, pick.jobId) : undefined;
           return (
             <li key={row.company} className="network-row">
               <div className="network-company">
@@ -118,11 +118,17 @@ export function Network({ onNotice }: Props) {
                 <p className="sub">
                   {row.contacts.length} {row.contacts.length === 1 ? 'person' : 'people'} / {row.job_count > 0 ? `${row.job_count} open ${row.job_count === 1 ? 'job' : 'jobs'}` : 'no open jobs'}
                 </p>
-                {row.job_count > 0 && (
-                  <button type="button" className="btn" aria-expanded={!!open} onClick={() => start(row)}>
-                    {open ? 'Close' : 'Write message'}
-                  </button>
-                )}
+                {row.contacts.map((c, i) => {
+                  const last = lastRecord(row, c.key);
+                  return (
+                    <button key={c.key} type="button" className={`network-person${i === pick.personIndex ? ' sel' : ''}`} aria-pressed={i === pick.personIndex} onClick={() => choose(row, { personIndex: i, jobId: pick.jobId })}>
+                      <span>{c.name}</span>
+                      {c.position && <span className="sub">{c.position}</span>}
+                      <span className="tg">{RELATIONSHIP[c.relationship] ?? c.relationship}</span>
+                      {last && <span className="sub">Messaged {shortDate(last.sent_at)}</span>}
+                    </button>
+                  );
+                })}
               </div>
 
               <ul className="network-jobs">
@@ -139,36 +145,10 @@ export function Network({ onNotice }: Props) {
               </ul>
 
               <div className="network-people">
-                {row.contacts.map((c) => {
-                  const last = lastRecord(row, c.key);
-                  return (
-                    <div key={c.key} className="network-person">
-                      <span>{c.name}</span>
-                      {c.position && <span className="sub">{c.position}</span>}
-                      <span className="tg">{RELATIONSHIP[c.relationship] ?? c.relationship}</span>
-                      {last && <span className="sub">Messaged {shortDate(last.sent_at)}</span>}
-                    </div>
-                  );
-                })}
-
-                {open && person && (
+                {person && (
                   <div className="network-draft">
-                    <label className="field-label" htmlFor={`person-${row.company}`}>Person</label>
-                    <select id={`person-${row.company}`} value={open.personIndex} onChange={(e) => change(row, Number(e.target.value), open.jobId)}>
-                      {row.contacts.map((c, i) => {
-                        const last = lastRecord(row, c.key);
-                        return (
-                          <option key={c.key} value={i}>
-                            {c.name}
-                            {c.position ? ` / ${c.position}` : ''}
-                            {last ? ` / messaged ${shortDate(last.sent_at)}` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-
                     <label className="field-label" htmlFor={`role-${row.company}`}>Role</label>
-                    <select id={`role-${row.company}`} value={open.jobId ?? ''} onChange={(e) => change(row, open.personIndex, e.target.value ? Number(e.target.value) : null)}>
+                    <select id={`role-${row.company}`} value={pick.jobId ?? ''} onChange={(e) => choose(row, { personIndex: pick.personIndex, jobId: e.target.value ? Number(e.target.value) : null })}>
                       {row.jobs.map((j) => (
                         <option key={j.id} value={j.id}>
                           {j.title}
@@ -177,30 +157,20 @@ export function Network({ onNotice }: Props) {
                       <option value="">No specific role</option>
                     </select>
 
-                    {open.jobId !== null && (
-                      <a href={row.jobs.find((j) => j.id === open.jobId)?.url} target="_blank" rel="noreferrer">
+                    {job && (
+                      <a href={job.url} target="_blank" rel="noreferrer">
                         Open the listing to check it
                       </a>
                     )}
 
-                    <textarea rows={7} value={open.text} onChange={(e) => setWriting({ ...open, text: e.target.value })} aria-label="Draft message" />
+                    <textarea rows={7} value={text} onChange={(e) => choose(row, { ...pick, text: e.target.value })} aria-label="Draft message" />
 
                     <div className="network-draft-actions">
-                      <button type="button" className="btn" onClick={() => copy(open.text)}>
-                        Copy draft
-                      </button>
-                      <button type="button" className="btn btn-dark" onClick={() => copy(open.text, () => window.open(linkedInPlace(person.name, row.company, person.profile_url), '_blank', 'noopener'))}>
+                      <button type="button" className="btn" onClick={() => copy(text, () => window.open(linkedInPlace(person.name, row.company, person.profile_url), '_blank', 'noopener'))}>
                         Copy and open LinkedIn
                       </button>
+                      {existing ? <p className="sub">{statusLine(existing)}</p> : <button type="button" className="btn btn-dark" onClick={() => markSent(person, pick.jobId)}>I sent it</button>}
                     </div>
-
-                    {existing ? (
-                      <p className="sub">{statusLine(existing)}</p>
-                    ) : (
-                      <button type="button" className="btn" onClick={() => markSent(person, open.jobId)}>
-                        I sent it
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -234,9 +204,8 @@ function messageFor(row: NetworkRow, personIndex: number, job: NetworkJob | null
   return draftMessage(person?.name ?? '', row.company, job ? { title: job.title, url: job.url } : null, me);
 }
 
-// Not available sits next to Open listing. Progress and Applied show until the job has them.
+// Open listing, Not available, and Applied. Applied stays visible but is disabled once the job has it.
 function JobLine({ job, records, onOpen, onDecide }: { job: NetworkJob; records: OutreachRecord[]; onOpen: () => void; onDecide: (action: Decide) => void }) {
-  const actions: Decide[] = ['not_available', ...(job.progressed ? [] : (['progress'] as const)), ...(job.applied ? [] : (['applied'] as const))];
   return (
     <li>
       <span className="network-job-title">{job.title}</span>
@@ -244,7 +213,7 @@ function JobLine({ job, records, onOpen, onDecide }: { job: NetworkJob; records:
         {job.location ?? 'Location not stated'} / {postedText({ posted_at: job.posted_at, posted_estimated: job.posted_estimated })}
       </span>
       <span className="tg">{job.score === null ? 'not scored' : `score ${job.score}`}</span>
-      <RowActions actions={actions} count={0} onOpen={onOpen} onDecide={onDecide} />
+      <RowActions actions={['not_available', 'applied']} done={job.applied ? ['applied'] : []} count={0} onOpen={onOpen} onDecide={onDecide} />
       {records.map((r) => (
         <span key={r.id} className={`tg ${r.status === 'replied' || r.status === 'referred' ? 'dir' : r.due ? 'red' : 'yel'}`}>
           {r.status === 'replied' ? `${r.person_name} replied` : r.status === 'referred' ? `${r.person_name} referred` : r.due ? `Follow up ${r.person_name}` : `Asked ${r.person_name}`}

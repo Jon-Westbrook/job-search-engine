@@ -13,20 +13,22 @@ export const DECIDE_LABEL: Record<Decide, string> = {
 
 interface RowActionsProps {
   actions: Decide[];
+  // Actions that already happened. They stay visible but cannot be pressed again.
+  done?: Decide[];
   count: number;
   onOpen: () => void;
   onDecide: (action: Decide) => void;
 }
 
 // count is the number of selected rows when this row is one of several. The buttons then say so.
-export function RowActions({ actions, count, onOpen, onDecide }: RowActionsProps) {
+export function RowActions({ actions, done = [], count, onOpen, onDecide }: RowActionsProps) {
   return (
     <div className="row-actions">
       <button type="button" className="btn btn-dark" data-row-button onClick={onOpen}>
         Open listing
       </button>
       {actions.map((action) => (
-        <button key={action} type="button" className={action === 'progress' || action === 'applied' ? 'btn' : 'btn btn-dark'} data-row-button onClick={() => onDecide(action)}>
+        <button key={action} type="button" className={action === 'progress' || action === 'applied' ? 'btn' : 'btn btn-dark'} data-row-button disabled={done.includes(action)} onClick={() => onDecide(action)}>
           {DECIDE_LABEL[action]}
           {count > 1 ? ` ${count}` : ''}
         </button>
