@@ -3,7 +3,9 @@ import { api, ApiError } from '../api.ts';
 import type { DirectFilter, Filter, JobListItem, JobsResponse, RefreshStatus, ResultRow, ResultsResponse, SavedView } from '../../shared/types.ts';
 import { clock } from '../format.ts';
 import { RefreshDialog } from './RefreshDialog.tsx';
-import { JobList, SORT_KEYS, defaultDir, matchesSearch, sortJobs, type Decide, type SortKey, type SortState } from './JobList.tsx';
+import { JobList, SORT_KEYS, defaultDir, matchesSearch, sortJobs, type SortKey, type SortState } from './JobList.tsx';
+import type { Decide } from './RowActions.tsx';
+import { DONE, openListing, sendDecision } from './useJobDecisions.ts';
 import { useSmallScreen } from '../hooks.ts';
 
 const FILTERS: Array<{ key: Filter; label: string }> = [
@@ -19,14 +21,6 @@ const DIRECTS: DirectFilter[] = ['any', 'tier1', 'tier2plus'];
 const DIRECT_LABEL: Record<DirectFilter, string> = { any: 'any', tier1: 'tier 1', tier2plus: 'tier 2 or higher' };
 // The list renders this many rows at a time. The rest appear on request.
 const CHUNK = 150;
-const DONE: Record<Decide, string> = {
-  progress: 'saved to Analysis',
-  applied: 'marked applied',
-  not_interested: 'marked not interested',
-  not_available: 'marked not available',
-  bring_back: 'brought back to Undecided',
-  reopen: 'reopened',
-};
 
 interface Stats {
   new_since_refresh: number;
@@ -202,14 +196,6 @@ export function Inbox(props: {
     });
   };
 
-  // On a phone the listing opens in a new tab. On a computer it opens in one small window that is
-  // reused, so a quick look does not pile up tabs. The owner opens it, not the app.
-  const openListing = (job: JobListItem) => {
-    if (small) window.open(job.url, '_blank', 'noopener');
-    else window.open(job.url, 'autojob-listing', 'popup=yes,width=1040,height=900,noopener');
-    api.post(`jobs/${job.id}/listing-opened`, {}).catch(() => undefined);
-  };
-
   // A decision on a row applies to every selected row when the row is one of several selected.
   // Rows leave the list at once. The request runs behind them, and rows it could not change come back.
   const decide = async (job: JobListItem, action: Decide) => {
@@ -218,7 +204,7 @@ export function Inbox(props: {
     setData((d) => d && { ...d, items: d.items.filter((j) => !gone.has(j.id)), counts: { ...d.counts, [filter]: Math.max(0, (d.counts[filter] ?? 0) - ids.length) } });
     setSelected(new Set());
     try {
-      const out = await api.post<{ done: number; failed: number[] }>('jobs/batch', { ids, action });
+      const out = await sendDecision(ids, action);
       props.onNotice(`${out.done} ${out.done === 1 ? 'job' : 'jobs'} ${DONE[action]}.`);
       if (out.failed.length > 0) {
         setError(`${out.failed.length} could not change and are back in the list.`);
@@ -424,7 +410,7 @@ export function Inbox(props: {
           onSort={onSort}
           onPick={pick}
           onPickAll={pickAll}
-          onOpen={openListing}
+          onOpen={(job) => openListing(job, small)}
           onDecide={decide}
           small={small}
           emptyText={emptyText}

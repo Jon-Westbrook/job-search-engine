@@ -164,6 +164,8 @@ export interface NetworkJob {
   band: Band;
   posted_at: string | null;
   posted_estimated: boolean;
+  progressed: boolean;
+  applied: boolean;
 }
 
 export interface NetworkRow {

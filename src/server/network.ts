@@ -64,6 +64,8 @@ export function buildNetwork(db: Db, nowIso: string = new Date().toISOString()):
         band: j.band,
         posted_at: j.posted_at,
         posted_estimated: j.posted_estimated,
+        progressed: Boolean(j.in_analysis || j.applied),
+        applied: Boolean(j.applied),
       })),
       job_count: jobs.length,
       best_score: jobs[0]?.score ?? null,

@@ -4,6 +4,9 @@ import type { NetworkContact, NetworkJob, NetworkRow, OutreachRecord } from '../
 import { draftMessage, type OwnerMessage } from '../../shared/drafts.ts';
 import { linkedInPlace } from '../../shared/person.ts';
 import { postedText, shortDate } from '../format.ts';
+import { useSmallScreen } from '../hooks.ts';
+import { RowActions, type Decide } from '../inbox/RowActions.tsx';
+import { DONE, openListing, sendDecision } from '../inbox/useJobDecisions.ts';
 
 // Everyone you know, grouped by company, with the open jobs there ranked by score. For a company,
 // pick the person and the role, and the draft includes the listing link. Copy it, or copy and open
@@ -31,6 +34,7 @@ interface Writing {
 }
 
 export function Network({ onNotice }: Props) {
+  const small = useSmallScreen();
   const [rows, setRows] = useState<NetworkRow[] | null>(null);
   const [me, setMe] = useState<OwnerMessage>({});
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +53,18 @@ export function Network({ onNotice }: Props) {
   useEffect(() => {
     void load();
   }, []);
+
+  // The line leaves the list at once. The company's next job fills the gap when the list reloads.
+  async function decide(job: NetworkJob, action: Decide) {
+    setRows((rs) => rs && rs.map((r) => (r.jobs.some((j) => j.id === job.id) ? { ...r, jobs: r.jobs.filter((j) => j.id !== job.id), job_count: Math.max(0, r.job_count - 1) } : r)));
+    try {
+      const out = await sendDecision([job.id], action);
+      onNotice(out.done ? `${job.title} ${DONE[action]}.` : 'That job could not change.');
+    } catch (err) {
+      onNotice(err instanceof ApiError ? err.message : 'The job did not update.');
+    }
+    void load();
+  }
 
   function start(row: NetworkRow) {
     if (writing?.company === row.company) return setWriting(null);
@@ -111,7 +127,13 @@ export function Network({ onNotice }: Props) {
 
               <ul className="network-jobs">
                 {row.jobs.map((j) => (
-                  <JobLine key={j.id} job={j} records={row.outreach.filter((o) => o.job_id === j.id && o.status !== 'dropped')} />
+                  <JobLine
+                    key={j.id}
+                    job={j}
+                    records={row.outreach.filter((o) => o.job_id === j.id && o.status !== 'dropped')}
+                    onOpen={() => openListing(j, small)}
+                    onDecide={(action) => decide(j, action)}
+                  />
                 ))}
                 {row.job_count > row.jobs.length && <li className="sub">and {row.job_count - row.jobs.length} more in the Inbox</li>}
               </ul>
@@ -212,16 +234,17 @@ function messageFor(row: NetworkRow, personIndex: number, job: NetworkJob | null
   return draftMessage(person?.name ?? '', row.company, job ? { title: job.title, url: job.url } : null, me);
 }
 
-function JobLine({ job, records }: { job: NetworkJob; records: OutreachRecord[] }) {
+// Not available sits next to Open listing. Progress and Applied show until the job has them.
+function JobLine({ job, records, onOpen, onDecide }: { job: NetworkJob; records: OutreachRecord[]; onOpen: () => void; onDecide: (action: Decide) => void }) {
+  const actions: Decide[] = ['not_available', ...(job.progressed ? [] : (['progress'] as const)), ...(job.applied ? [] : (['applied'] as const))];
   return (
     <li>
-      <a className="network-job-title" href={job.url} target="_blank" rel="noreferrer">
-        {job.title}
-      </a>
+      <span className="network-job-title">{job.title}</span>
       <span className="sub">
         {job.location ?? 'Location not stated'} / {postedText({ posted_at: job.posted_at, posted_estimated: job.posted_estimated })}
       </span>
       <span className="tg">{job.score === null ? 'not scored' : `score ${job.score}`}</span>
+      <RowActions actions={actions} count={0} onOpen={onOpen} onDecide={onDecide} />
       {records.map((r) => (
         <span key={r.id} className={`tg ${r.status === 'replied' || r.status === 'referred' ? 'dir' : r.due ? 'red' : 'yel'}`}>
           {r.status === 'replied' ? `${r.person_name} replied` : r.status === 'referred' ? `${r.person_name} referred` : r.due ? `Follow up ${r.person_name}` : `Asked ${r.person_name}`}

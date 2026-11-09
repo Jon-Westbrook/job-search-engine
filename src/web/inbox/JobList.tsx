@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react';
 import type { Filter, JobListItem } from '../../shared/types.ts';
 import { SOURCE_CHANNELS } from '../../shared/channels.ts';
 import { arrangementWord, postedText, scoreAnnouncement } from '../format.ts';
+import { RowActions, type Decide } from './RowActions.tsx';
 
 export type SortKey = 'score' | 'target' | 'posted' | 'company' | 'role' | 'source';
 export interface SortState {
@@ -11,23 +12,12 @@ export interface SortState {
 export const SORT_KEYS: SortKey[] = ['score', 'target', 'posted', 'company', 'role', 'source'];
 const SORT_LABEL: Record<SortKey, string> = { score: 'Score', target: 'Target', posted: 'Posted', company: 'Company', role: 'Role', source: 'Source' };
 
-// The row decisions. Each one takes the job out of the view it was made in, except Open listing.
-export type Decide = 'progress' | 'applied' | 'not_interested' | 'not_available' | 'bring_back' | 'reopen';
-export const DECIDE_LABEL: Record<Decide, string> = {
-  progress: 'Progress',
-  applied: 'Applied',
-  not_interested: 'Not interested',
-  not_available: 'Not available',
-  bring_back: 'Bring back',
-  reopen: 'Reopen',
-};
-const QUEUE_ACTIONS: Decide[] = ['progress', 'not_interested', 'not_available'];
 const VIEW_ACTIONS: Partial<Record<Filter, Decide[]>> = {
-  undecided: QUEUE_ACTIONS,
-  good: QUEUE_ACTIONS,
-  targets: QUEUE_ACTIONS,
+  undecided: ['progress', 'not_interested', 'not_available'],
+  good: ['progress', 'not_interested', 'not_available'],
+  targets: ['progress', 'not_interested', 'not_available'],
   progressed: ['applied', 'not_available'],
-  not_interested: ['bring_back'],
+  not_interested: ['bring_back', 'not_available'],
   not_available: ['reopen'],
 };
 
@@ -147,7 +137,7 @@ export function JobList(props: ListProps) {
                 {job.asked && <span className="tg yel">{job.asked}</span>}
                 <span className="tg">{postedText(job)}</span>
               </div>
-              <RowActions job={job} {...row} />
+              <RowActionsForJob job={job} {...row} />
             </article>
           ))}
         </div>
@@ -201,7 +191,7 @@ export function JobList(props: ListProps) {
                   ))}
                 </td>
                 <td data-label="Listing">
-                  <RowActions job={job} {...row} />
+                  <RowActionsForJob job={job} {...row} />
                 </td>
               </tr>
             );
@@ -240,22 +230,9 @@ function orderedActions(view: Filter): Decide[] {
   return [...actions.filter((a) => a === 'not_available'), ...actions.filter((a) => a !== 'not_available')];
 }
 
-function RowActions(props: RowProps) {
+function RowActionsForJob(props: RowProps) {
   const { job, view, selected, onOpen, onDecide } = props;
   const blocked = Boolean(job.blocked || job.rule_blocked);
-  const many = selected.has(job.id) && selected.size > 1;
-  return (
-    <div className="row-actions">
-      <button type="button" className="btn btn-dark" data-row-button onClick={() => onOpen(job)}>
-        Open listing
-      </button>
-      {!blocked &&
-        orderedActions(view).map((action) => (
-          <button key={action} type="button" className={action === 'progress' || action === 'applied' ? 'btn' : 'btn btn-dark'} data-row-button onClick={() => onDecide(job, action)}>
-            {DECIDE_LABEL[action]}
-            {many ? ` ${selected.size}` : ''}
-          </button>
-        ))}
-    </div>
-  );
+  const count = selected.has(job.id) && selected.size > 1 ? selected.size : 0;
+  return <RowActions actions={blocked ? [] : orderedActions(view)} count={count} onOpen={() => onOpen(job)} onDecide={(action) => onDecide(job, action)} />;
 }
